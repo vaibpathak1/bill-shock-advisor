@@ -54,3 +54,24 @@ CREATE TABLE llm_call_log (
 ) PARTITION BY RANGE (called_month);
 
 ALTER SEQUENCE llm_call_log_call_id_seq OWNED BY llm_call_log.call_id;
+
+-- Structured diagnosis per conversation and bill (SPEC §4.6; agent.md §8.2; 5a answer Q-35).
+-- Money always comes from the engine, never from the LLM. Not partitioned: about one row per
+-- conversation (A-103). Retention: 7 months, daily batch delete by created_at (data-architecture.md §10).
+CREATE TABLE bill_diagnosis (
+    diagnosis_id        uuid          PRIMARY KEY,
+    conversation_id     uuid          NOT NULL REFERENCES conversation (conversation_id),
+    account_id          bigint        NOT NULL REFERENCES account (account_id),
+    bill_period         date          NOT NULL CHECK (extract(day FROM bill_period) = 1),
+    verdict             text          NOT NULL CHECK (verdict IN ('MEANINGFUL_INCREASE', 'NORMAL', 'INSUFFICIENT_HISTORY')),
+    total_excess        numeric(14,2),                                -- GST-inclusive; NULL without history
+    causes              jsonb         NOT NULL,
+    confidence          text          NOT NULL CHECK (confidence IN ('HIGH', 'MEDIUM', 'LOW')),
+    recommended_actions jsonb         NOT NULL,
+    source              text          NOT NULL CHECK (source IN ('LLM', 'ENGINE')),
+    prompt_version      text          NOT NULL,
+    created_at          timestamptz   NOT NULL DEFAULT now()
+);
+
+CREATE INDEX bill_diagnosis_account_idx ON bill_diagnosis (account_id, bill_period DESC, created_at DESC);
+CREATE INDEX bill_diagnosis_created_idx ON bill_diagnosis (created_at);                 -- 7-month retention delete (3b)

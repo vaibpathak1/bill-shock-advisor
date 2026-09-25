@@ -1,0 +1,1 @@
+Your $period$ bill of $total$ is in line with your recent bills.

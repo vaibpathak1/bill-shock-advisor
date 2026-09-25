@@ -9,11 +9,15 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-/** A Spring Boot test against the seeded Testcontainers database (needs Docker; run by Failsafe). */
+/**
+ * A Spring Boot test against the seeded Testcontainers database (needs Docker; run by Failsafe),
+ * with the web server on a random port and the chat model pointed at the {@link FakeAnthropicApi}.
+ * All ITs share one context.
+ */
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
-@SpringBootTest
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
-@Import(PostgresTestcontainers.class)
+@Import({ PostgresTestcontainers.class, FakeAnthropicApiConfiguration.class })
 public @interface IntegrationTest {
 }

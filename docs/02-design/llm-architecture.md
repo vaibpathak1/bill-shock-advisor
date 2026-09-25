@@ -124,8 +124,16 @@ sequenceDiagram
   LLM call (NFR-01a p95 < 1.5 s). The `DiffResult` is injected **as a message** (a context
   block right before the user message), **never into the system prompt**, so the cached
   prefix stays identical for all customers (§5).
-- **SSE event types:** `summary`, `progress`, `token`, `diagnosis`, `actions`, `fallback`,
-  `error`, `done`, plus a comment heartbeat every 15 s (scalability.md §2).
+- **SSE event types:** `summary`, `progress`, `token`, `reset`, `diagnosis`, `actions`,
+  `fallback`, `error`, `done`, plus a comment heartbeat every 15 s (scalability.md §2).
+  `token` carries one gated sentence. `reset` (5a answer Q-34) tells the client to discard the
+  draft before a regenerated answer; `fallback` replaces any draft (agent.md §4.1).
+- **Tool loop (Phase 5a, agent.md F-10 to F-12):** in Spring AI 2.0.1 the chat model no
+  longer runs tools; ChatClient's `ToolCallingAdvisor` would. That advisor runs tools on a
+  Reactor worker without the SecurityContext and sums usage across rounds. So the
+  orchestrator runs the loop itself: one streamed `ChatClient` call per round (advisor
+  auto-registration off), tools executed on the turn's thread through `TurnToolBudget`, and one
+  `llm_call_log` row per round.
 - **Structured output while streaming:** the customer-facing text streams. The structured
   `BillShockDiagnosis` (`causes[]`, `totalExcess`, `confidence`, `recommendedActions[]`,
   SPEC §4.6) is delivered by a final **reporting tool call** `recordDiagnosis(...)`, whose
@@ -233,8 +241,9 @@ measured on the first *released* sentence.
 
 ## 8. Chat memory
 
-- A custom `ChatMemoryRepository` (Spring AI interface, F-4) over `chat_messages`
-  (data-architecture.md §4.6):
+- A custom append-only store over `chat_messages` (data-architecture.md §4.6). **5a
+  deviation (agent.md F-18):** it does not implement Spring AI's `ChatMemoryRepository`,
+  whose `saveAll` means "replace the conversation"; the orchestrator uses it directly:
   - append-only inserts, never delete-and-reinsert;
   - `conversation_id` is a **UUIDv7**, and the repository derives `conversation_month` (the
     partition key) from the id's timestamp, so every lookup prunes to one partition.
@@ -338,14 +347,14 @@ is the global kill switch (ADR-005).
 | Item | Phase |
 |---|---|
 | ~~Q-2 final: prompt caching in the pinned Spring AI version~~ **Done** (2.0.1, F-1, ADR-008) | 3a |
-| Unit test: both Anthropic beans carry `maxRetries = 0` and an explicit timeout (ADR-008) | 5a |
-| Q-1: live call to `claude-sonnet-5` with and without temperature (owner approval) | 5a |
-| Breakpoints re-applied on every tool-loop round; cache-read share ≥ 60% | 5a |
-| T-6: options exist in 2.0.1 (F-3); choose `effort` / thinking values for C-6 and measure | 5a/5b |
+| ~~Unit test: the Anthropic bean carries `maxRetries = 0` and an explicit timeout (ADR-008)~~ **Done** (`LlmConfigurationTest`; the Haiku bean in 5b) | 5a |
+| Q-1: live call to `claude-sonnet-5` with and without temperature: **deferred — run when API key is available** (command in PROGRESS.md) | 5a → deferred |
+| Breakpoints re-applied on every tool-loop round: **confirmed in code** (agent.md F-14) and in the recorded requests (`ChatApiIT`); cache-read share ≥ 60%: **deferred — run when API key is available** | 5a |
+| T-6: options exist in 2.0.1 (F-3); choose `effort` / thinking values for C-6 and measure: **deferred — run when API key is available** | 5a/5b |
 | Native structured output via `outputConfig` (F-3) vs prompt-based converter | 5b |
 | T-7: extend the proactive prefix only with quality-improving content (Q-18); measure cache hits | 7 |
 | Transformers model files bundled; no runtime download | 8 |
-| Choose the Haiku-tier model through §15 | 5a |
+| Choose the Haiku-tier model through §15: **steps 1–2 done** (agent.md §12, 5a answer Q-32); evals and wiring | 5b |
 
 ## 15. Model selection and eval-gated model switch (decision Q-15)
 

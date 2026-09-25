@@ -38,6 +38,11 @@ public final class InrFormat {
         return amount(money) + " excl. GST";
     }
 
+    /** A GST component: {@code ₹319.50 GST}. */
+    public static String gst(Money money) {
+        return amount(money) + " GST";
+    }
+
     /**
      * A catalogue price before GST, as in SPEC §4.6: {@code ₹599 + GST}, or {@code ₹29.50 + GST}
      * when the price has paise.

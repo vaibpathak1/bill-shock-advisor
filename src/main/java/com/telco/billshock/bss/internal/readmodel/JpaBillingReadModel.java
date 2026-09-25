@@ -5,6 +5,7 @@ import com.telco.billshock.domain.AccountId;
 import com.telco.billshock.domain.BillPeriod;
 import com.telco.billshock.domain.Money;
 import com.telco.billshock.domain.SupplyType;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,13 +25,24 @@ class JpaBillingReadModel implements BillingReadModel {
     private final LineItemRepository lineItems;
     private final UsagePeriodRepository usagePeriods;
     private final UsagePeriodRoamingRepository roaming;
+    private final JdbcClient jdbc;
 
     JpaBillingReadModel(BillRepository bills, LineItemRepository lineItems, UsagePeriodRepository usagePeriods,
-            UsagePeriodRoamingRepository roaming) {
+            UsagePeriodRoamingRepository roaming, JdbcClient jdbc) {
         this.bills = bills;
         this.lineItems = lineItems;
         this.usagePeriods = usagePeriods;
         this.roaming = roaming;
+        this.jdbc = jdbc;
+    }
+
+    @Override
+    public Optional<AccountSummary> account(AccountId accountId) {
+        return jdbc.sql("SELECT msisdn, bill_cycle_day, gst_state_code, status FROM account WHERE account_id = ?")
+            .param(accountId.value())
+            .query((rs, n) -> new AccountSummary(accountId, rs.getString(1), rs.getInt(2), rs.getString(3),
+                    rs.getString(4)))
+            .optional();
     }
 
     @Override

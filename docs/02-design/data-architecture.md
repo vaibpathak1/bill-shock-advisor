@@ -81,6 +81,7 @@ Rows at 1x are steady state. The module is the Spring Modulith owner (architectu
 | `conversation` | `agent` | Conversation metadata: account, channel, prompt version, model, cost | `conversation_id` (UUIDv7) | — | 13 months | Pseudonymous | 320 k/month |
 | `chat_messages` | `agent` | Chat memory (scrubbed text) | `(conversation_id, conversation_month, seq)` | `conversation_month`, monthly | 90 days hot (4 partitions), then transcript archive to S3 for 1 year | Personal (free text, scrubbed) | 23 M |
 | `llm_call_log` | `agent` | Per-call tokens, cache fields, cost, latency, request id | `(called_month, call_id)` | `called_month`, monthly | 13 months | — | 6.2 M/month |
+| `bill_diagnosis` | `agent` | Structured diagnosis per conversation and bill; money from the engine (Phase 5a, Q-35) | `diagnosis_id` (UUIDv7) | — (A-103) | 7 months (§10) | Pseudonymous (account id, no free text except recommendation summaries that passed the grounding gate) | ≈ 320 k/month |
 | `proposed_action` | `actions` | ProposedAction state machine (ADR-004) | `action_id`, unique `idempotency_key` | — | 7 years (**FOR LEGAL REVIEW**) | Personal | ~160 k/month (0.5 per conversation) |
 | `idempotency_record` | `actions` | Stored confirm/reject responses per `Idempotency-Key` | `(account_id, idempotency_key)` | — | 30 days | — | small |
 | `audit_events` | `audit` | Immutable audit (SPEC §4.3 rule 5) | `(occurred_at, audit_id)` | `occurred_at`, monthly | 13 months hot, then S3 archive, 7 years total (**FOR LEGAL REVIEW**) | Masked payloads | 21 M/month |
@@ -190,6 +191,11 @@ event_type, tool_name, action_id, prompt_version, payload jsonb (masked), result
 - `llm_call_log`: `call_id, called_month, conversation_id (nullable for proactive),
   model, prompt_version, input_tokens, cache_write_tokens, cache_read_tokens,
   output_tokens, cost_usd NUMERIC(14,6), latency_ms, provider_request_id, outcome`.
+- `bill_diagnosis` (Phase 5a, Q-35): `diagnosis_id, conversation_id, account_id,
+  bill_period, verdict, total_excess NUMERIC(14,2), causes jsonb, confidence,
+  recommended_actions jsonb, source (LLM|ENGINE), prompt_version, created_at`. Not
+  partitioned (A-103). Indexes: `(account_id, bill_period DESC, created_at DESC)` for the
+  latest diagnosis of a bill (6a endpoint), `(created_at)` for the retention delete.
 
 ## 5. Partitioning
 
@@ -389,7 +395,7 @@ interpretations.
 |---|---|---|---|
 | Usage daily | 3 billing months | Dropped (BSS is the system of record) | Partition drop |
 | Usage period, bills, line items | 7 billing months | Dropped | Partition drop |
-| Diagnoses, notifications | 7 months | Deleted | Daily batch delete (small tables) |
+| Diagnoses (`bill_diagnosis`), notifications | 7 months, the same as the bills they explain (a diagnosis without its bill cannot be shown or checked) | Deleted | Daily batch delete by `created_at`, in chunks of 10,000 rows (index `bill_diagnosis_created_idx`). It runs before the conversation delete (13 months), so the foreign key never blocks it. Part of the 3b retention job; erasure requests delete by `account_id` |
 | Chat messages | 90 days | Transcript export to S3 (JSON, scrubbed), kept 1 year, then deleted by S3 lifecycle | Export, verify, drop partition |
 | Conversation, `llm_call_log`, feedback | 13 months | Deleted / dropped | Batch delete / partition drop |
 | Audit events | 13 months | S3 archive (Parquet + manifest), total 7 years, Object Lock | Export, verify checksum, drop partition |

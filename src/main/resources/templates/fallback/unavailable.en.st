@@ -1,0 +1,1 @@
+I cannot give a fuller explanation right now; the figures above come straight from your bill.

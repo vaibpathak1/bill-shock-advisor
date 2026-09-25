@@ -37,6 +37,13 @@ public interface BillingReadModel {
     /** Roaming usage by country billed on one bill ({@code usage_period_roaming}, ADR-007). */
     List<RoamingUsage> roamingUsage(AccountId accountId, BillPeriod billedPeriod);
 
+    /** The account's reference data. */
+    Optional<AccountSummary> account(AccountId accountId);
+
+    /** @param msisdn PII: mask it before it leaves the server (security.md §6) */
+    record AccountSummary(AccountId accountId, String msisdn, int billCycleDay, String gstStateCode, String status) {
+    }
+
     record BillSummary(long billId, AccountId accountId, BillPeriod billPeriod,
             LocalDate periodStart, LocalDate periodEnd, LocalDate billDate,
             String placeOfSupply, SupplyType supplyType,

@@ -8,3 +8,10 @@ spring:
     enabled: true
     # Schema plus demo seed data (db/seed never runs outside dev/test, A-82).
     locations: classpath:db/migration,classpath:db/seed
+
+billshock:
+  security:
+    demo-users:
+      enabled: true
+      password: ${DEMO_USER_PASSWORD:}
+      users: { cust1001: 1001, cust1002: 1002, cust1003: 1003, cust1004: 1004, cust1005: 1005, cust1006: 1006 }

@@ -4,8 +4,8 @@ An agentic assistant that investigates unexpected spikes in a telecom customer's
 explains the root cause, proposes tailored resolutions and executes approved actions
 within guardrails. Specification: [SPEC.md](SPEC.md). Progress: [docs/PROGRESS.md](docs/PROGRESS.md).
 
-> Status: Phase 3a (foundation) is done: schema, seed data for the 6 demo scenarios and
-> mock BSS gateways. The chat agent, the demo script and the UI arrive in Phases 5a–6a.
+> Status: Phase 5a (agent) is at its gate: `POST /api/v1/chat` streams a grounded bill
+> explanation. Actions, the demo script and the chat page arrive in Phase 6a.
 
 ## Prerequisites
 
@@ -20,7 +20,9 @@ The Maven Wrapper (`./mvnw`) downloads Maven itself; no local Maven install is n
 
 All commands run from the repository root.
 
-**1. Create `.env` from the template** and set at least `POSTGRES_PASSWORD`:
+**1. Create `.env` from the template** and set at least `POSTGRES_PASSWORD`,
+`DEMO_USER_PASSWORD` and either `ANTHROPIC_API_KEY_CHAT` or `BILLSHOCK_LLM_MODE=TEMPLATE_ONLY`
+(deterministic answers only, no key and no cost):
 
 ```bash
 cp .env.example .env
@@ -59,8 +61,20 @@ variables from the environment.
 The `dev` profile applies the Flyway migrations **and the demo seed data** on startup
 (the seed never runs outside `dev` and `test`). It also switches on the in-process mock
 BSS gateways (`mock-bss`). You should see `Successfully applied 9 migrations` and then
-`Started BillShockAdvisorApplication`. The app listens on port 8080; Phase 3a has no
-endpoints yet.
+`Started BillShockAdvisorApplication`. The app listens on port 8080. Startup stops with a
+clear message if `DEMO_USER_PASSWORD` is empty, or if `BILLSHOCK_LLM_MODE=LLM` and
+`ANTHROPIC_API_KEY_CHAT` is empty.
+
+**Try the chat** (server-sent events; users `cust1001` … `cust1006`, one per demo scenario).
+With `LLM` mode this calls Anthropic and costs money:
+
+```bash
+curl -N -u "cust1001:$DEMO_USER_PASSWORD" -H 'Content-Type: application/json' -d '{"message":"Why is my bill so high?"}' http://localhost:8080/api/v1/chat
+```
+
+The first event is the deterministic `summary`; then `token` events (one checked sentence
+each), `diagnosis` and `done`. To continue the conversation, send the `conversationId` from
+`done` with the next message.
 
 **5. Connect with psql**, using the client inside the container (nothing to install):
 

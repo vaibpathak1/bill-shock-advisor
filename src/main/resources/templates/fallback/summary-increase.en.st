@@ -1,0 +1,1 @@
+Your $period$ bill is $excess$ higher than the average of your previous $count$ bills, mainly because of $group$ charges of $amount$.

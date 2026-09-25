@@ -1,0 +1,1 @@
+The charge on line $first$ appears again on line $repeat$ of this bill; the repeated charge can be disputed.

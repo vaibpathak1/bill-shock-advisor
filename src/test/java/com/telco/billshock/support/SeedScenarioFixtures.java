@@ -97,6 +97,12 @@ public final class SeedScenarioFixtures {
                 .toList();
         }
 
+        @Override
+        public Optional<AccountSummary> account(AccountId accountId) {
+            return latestBill(accountId).map(b -> new AccountSummary(accountId,
+                    "+9155500" + accountId.value(), b.billDate().getDayOfMonth(), b.placeOfSupply(), "ACTIVE"));
+        }
+
         /**
          * Adds a bill from its charge lines; the TAX lines, subtotal and totals are computed
          * with the GST rule.

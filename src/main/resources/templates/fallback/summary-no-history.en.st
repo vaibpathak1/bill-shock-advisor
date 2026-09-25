@@ -1,0 +1,1 @@
+Your $period$ bill of $total$ is the first bill on your account, so there is nothing to compare it with yet.

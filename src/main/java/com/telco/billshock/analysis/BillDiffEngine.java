@@ -55,6 +55,11 @@ public class BillDiffEngine {
         return diff(accountId, billPeriod, DEFAULT_BASELINE_MONTHS);
     }
 
+    /** The diff of the account's latest bill (the "current" bill) against the default baseline. */
+    public Optional<BillDiff> diffLatest(AccountId accountId) {
+        return billing.latestBill(accountId).map(current -> diff(current, DEFAULT_BASELINE_MONTHS));
+    }
+
     /**
      * @param baselineMonths how many billing months before {@code billPeriod} form the baseline
      * @return empty if the account has no bill for {@code billPeriod}

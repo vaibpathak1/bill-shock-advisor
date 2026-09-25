@@ -5,8 +5,8 @@
 | 1. Docs I | **Done** (approved 2026-09-25) | PRD, feasibility, capacity estimates, plan and budget, NFRs, assumptions register |
 | 2. Docs II | **Done; review answers Q-14–Q-19 applied** (2026-09-25) | Architecture, ADR-001 to ADR-007, data architecture (with EXPLAIN evidence), scalability, security, LLM architecture, observability |
 | 3a. Foundation (MVP slice) | **Done, approved** (owner, 2026-09-25). Gate-review changes applied; `./mvnw verify` passes | Scope: plan-and-budget §2a |
-| 4a. Deterministic core (MVP slice) | **Gate review changes applied** (2026-09-25); `./mvnw verify` passes (112 unit + 94 IT) | Design: `docs/03-development/deterministic-core.md` |
-| 5a. Agent (MVP slice) | Not started | |
+| 4a. Deterministic core (MVP slice) | **Done, approved and committed** (owner, 2026-09-25); `./mvnw verify` passes (112 unit + 94 IT) | Design: `docs/03-development/deterministic-core.md` |
+| 5a. Agent (MVP slice) | **Gate review changes applied** (2026-09-25); `./mvnw verify` passes (201 unit + 121 IT). Live checks **deferred — run when API key is available** | Design: `docs/03-development/agent.md` |
 | 6a. Actions (MVP slice) + demo wrap-up | Not started | All 6 scenarios end to end |
 | 3b. Foundation (remainder) | Not started | |
 | 4b. Deterministic core (remainder) | Not started | |
@@ -102,11 +102,12 @@ Headline results:
 
 ## Open questions
 
-All questions up to Q-31 are decided; see the log below. Only follow-up actions remain, plus the 4a gate items in the Phase 4a section.
+All questions up to Q-35 are decided; see the log below. Only follow-up actions remain, plus the 4a gate items in the Phase 4a section.
 
 | # | Status | Remaining action | When |
 |---|---|---|---|
-| Q-1 | Decided; live check deferred | Documented behaviour used (llm-architecture.md §3). Live call to `claude-sonnet-5` with and without temperature, **only with the owner's approval** | Phase 5a |
+| Q-1 | Decided; live check **deferred — run when API key is available** | Live check 1 (command ready in the Phase 5a section) | When API credits exist |
+| NFR-21 / T-6 | **Deferred — run when API key is available** | Live checks 2 (cache-read share ≥ 60%) and 3 (`effort=medium`); commands ready in the Phase 5a section | When API credits exist |
 | Q-2 | Done | Caching verified in the pinned Spring AI 2.0.1 sources (llm-architecture.md F-1, ADR-008) | — |
 | Q-3 | Decided (with Q-7) | — | — |
 | Q-4 | Done | Both SLIs and the hourly alert are in `observability.md` §1, §6 | — |
@@ -120,9 +121,9 @@ All questions up to Q-31 are decided; see the log below. Only follow-up actions 
 | Q-12 | Decided | — | — |
 | Q-13 | Deferred by agreement | Measure the real turn mix, then decide on Haiku-first routing | Phase 5b |
 | Q-14 | Decided | ADR-005 "recommended — pending legal review". Record the legal/DPO sign-off in ADR-005 before any production data | Before production |
-| Q-15 | Decided | No fall-back model now. Choose the current Haiku-tier model in 5a using the eval-gated process (llm-architecture.md §15) | Phase 5a |
+| Q-15 | Steps 1–2 done (Q-32) | `claude-haiku-4-5-20251001` is the only Haiku-tier model (agent.md §12); evals and wiring in 5b; re-check the deprecations page at 5b start (A-102) | Phase 5b |
 | Q-16 | Decided | Implement `clientMessageId` + `GET /api/v1/chat/{conversationId}/messages` as designed in architecture.md §11 | **Phase 5b** (not in the MVP slice) |
-| Q-17 | Decided | Implement `NUMERIC(14,6)` USD metering with prices per MTok in config | Phase 5a |
+| Q-17 | Done (5a) | `CostMeter` + `llm_call_log` per round trip + `conversation.llm_cost_usd` | — |
 | Q-18 | Decided | No artificial padding; extend the proactive prompt only with quality-improving content; revisit with the successor model's cache minimum | Phase 7 |
 | Q-19 | Decided | — | — |
 | Q-20 | Decided | Credits/refunds include GST; goodwill thresholds on the GST-inclusive amount; FOR TAX REVIEW (A-72) | Implement in 4a (guardrails) / 6a (actions) |
@@ -134,8 +135,12 @@ All questions up to Q-31 are decided; see the log below. Only follow-up actions 
 | Q-26 | Decided | `AnomalyDetector` stays in 4b; 4a tests the chat column of seed-scenarios.md §5.7, 4b the proactive columns | 4a / 4b |
 | Q-27 | Done (4a) | `RECENT_PLAN_CHANGE` rule built and tested (deterministic-core.md §3.2) | — |
 | Q-28 | Done (4a) | `isd_min` added (V3/V1003 edited in place; **run `docker compose down -v` on a local database**) | — |
-| Q-29 | Partly done | Pure `ToolCallBudget` policy built in 4a; wire the `TurnToolBudget` decorator | Phase 5a |
-| Q-30 | Done (4a) | `InrFormat` in `domain`; the tools use it for GST-labelled strings | Phase 5a (use) |
+| Q-29 | Done (5a) | `TurnToolBudget` decorator wired in the orchestrator's tool loop (agent.md §5) | — |
+| Q-30 | Done | `InrFormat` used by the tools, templates and diagnosis (`InrFormat.gst` added) | — |
+| Q-32 | Decided | Haiku desk research only in 5a; evals and wiring in 5b | 5b |
+| Q-33 | Done (hook) | `ToolCallAuditor` hook called for every executed/refused call; implementation writes `audit_events` | 6a |
+| Q-34 | Done | Gate each sentence before sending; `reset` only after sent sentences; NFR-01b measurement updated | — |
+| Q-35 | Done | `bill_diagnosis` table (V4 edited in place; run `docker compose down -v` on a local database) | — |
 | A-86 limitation | Open | VAS refund amount from BSS when the subscription predates the local history | After the MVP slice |
 
 ## Decisions log
@@ -213,6 +218,22 @@ the questions raised in the Phase 1 documents.
 | 2026-09-25 | 4a gate item 4 (changed): VAS refunds are exempt from the goodwill percentage and prior-credit rules, **not from the absolute limits**: above ₹2,000 incl. GST → escalate, as for goodwill. **No money-out action may be uncapped.** Implemented as `MoneyOutCap` (config `billshock.guardrails.money-out-escalate-above-inr`), with boundary tests | Repo owner |
 | 2026-09-25 | 4a gate item 7: A-94 with Q-20 confirmed: thresholds are evaluated on the GST-inclusive amount, which the chain computes itself from the before-GST input with the bill-level rule; tests `ThresholdsUseTheGstInclusiveAmount` | Repo owner |
 | 2026-09-25 | Phase 3a committed and merged to `main` as `0bc7d15`; 4a is on branch `phase-4a-engines` | Repo owner |
+| 2026-09-25 | VAS refunds get **no ₹500 supervisor flag**: they are evidence-based, not discretionary (rationale in deterministic-core.md §4.5a). The ₹2,000 money-out cap stays | Repo owner |
+| 2026-09-25 | **5a display rule:** simulation results shown to customers always give "new bill total" and "saving" as separately labelled amounts, e.g. `PP_499`: new bill ₹588.82 incl. GST, saving ₹317.00 incl. GST | Repo owner |
+| 2026-09-25 | **Phase 4a approved and committed** | Repo owner |
+| 2026-09-25 | **Phase 5a go-ahead.** Q-32: Haiku-tier model: desk research only in 5a (official models and deprecations pages, dated); evals and wiring in 5b | Repo owner |
+| 2026-09-25 | Q-33: `ToolCallAuditor` hook point now, implementation in 6a | Repo owner |
+| 2026-09-25 | Q-34: gate each sentence before emitting it (buffer one sentence, run the gate, then send); the summary covers NFR-01a; `reset` only as a rare fallback when regeneration is needed after sentences were sent; update NFR-01b's measurement | Repo owner |
+| 2026-09-25 | Q-35: `bill_diagnosis` table, editing V4 in place | Repo owner |
+| 2026-09-25 | 5a Q-A: no Spring AI starter; wire Spring AI observability (chat model and tool calls) explicitly, with a test that the observations are recorded | Repo owner |
+| 2026-09-25 | 5a Q-F: full free-text scrubber in 5a | Repo owner |
+| 2026-09-25 | 5a live checks allowed with rules: never read/print `.env` or the key; load it only via `set -a; source .env; set +a` inside the command; show each live command and wait for approval; total < $2; report tokens and cost after each check | Repo owner |
+| 2026-09-25 | **5a gate review:** items 2, 3, 4 accepted. Item 1 accepted, with the rejected alternatives recorded (agent.md §4.2); keep the custom loop only if gating and the budget genuinely need it (analysis: they do not; the loop stays for targeted regeneration and the single identity rule, flagged back to the owner) | Repo owner |
+| 2026-09-25 | 5a gate item 5: `bill_diagnosis` unpartitioned; add a retention rule (done: 7 months, data-architecture.md §10, index `bill_diagnosis_created_idx`) | Repo owner |
+| 2026-09-25 | 5a gate item 6 (A-106 changed): prompt rule against repeating customer amounts; a customer-typed amount → regenerate once, then fallback `CUSTOMER_AMOUNT` with its own metric; tests for "why is my bill ₹3,000?" and "I was promised a ₹5,000 credit" | Repo owner |
+| 2026-09-25 | 5a live checks: all three approved; run in order, command shown before each, tokens and cost reported | Repo owner |
+| 2026-09-25 | 5a live checks **skipped for now** (no API credits yet): Q-1, NFR-21 cache share and T-6 marked "deferred — run when API key is available", with the exact commands kept in PROGRESS.md | Repo owner |
+| 2026-09-25 | New AGENTS.md rule: never create, modify, move or delete `.env`; use a differently named temp file (e.g. `.env.test-tmp`) for experiments and remove only that | Repo owner |
 | 2026-09-25 | Phase 2 answer 7: A-58 to A-65 accepted. A-63 limitation documented (usage up to the previous day; no in-trip real-time alerts in v1; real-time usage events as a future enhancement) | Repo owner |
 
 ## Notes for the Phase 3a session
@@ -467,12 +488,193 @@ gate (4b); `ProposedAction` persistence and executed-credit history (6a); the
 - **Mutation check** (sources restored afterwards):
   - removing the VAS cap fails 1 test
   - comparing goodwill thresholds before GST fails 9 tests
-- **Open:** the owner stated only the ₹2,000 cap for VAS refunds. The ₹500 supervisor limit
-  does not apply to refunds. Confirm.
+- **Decided:** VAS refunds have no ₹500 supervisor flag (evidence-based, not discretionary);
+  only the ₹2,000 cap applies (deterministic-core.md §4.5a).
+
+## Phase 5a progress (2026-09-25)
+
+**Status: built, at the gate.** `./mvnw verify` passes: 195 unit tests (was 112) and 119
+integration tests (was 94). The design note and the code are reviewed together. The live checks
+are deferred until an API key is available (commands below).
+
+Files (all uncommitted; the owner commits):
+- **New doc:** `docs/03-development/agent.md`: design, the checked Spring AI 2.0.1 API table
+  (F-10 to F-21), and the Haiku desk research (§12).
+- **Updated docs:**
+  - `assumptions.md`: §10, A-96 to A-108
+  - `nfr.md`: NFR-01b measurement (Q-34)
+  - `llm-architecture.md`: §4 SSE events and the tool loop, §8 memory deviation, §14
+    statuses
+  - `README.md`: run steps and a chat `curl`
+  - `.env.example`: `ANTHROPIC_API_KEY_CHAT`, `BILLSHOCK_LLM_MODE`, `DEMO_USER_PASSWORD`
+- **Schema:** V4 adds `bill_diagnosis`, edited in place (Q-35). **Run `docker compose down -v`**
+  on a local database.
+- **pom:** `spring-ai-anthropic`, `spring-ai-client-chat` (no starter),
+  `spring-boot-starter-security`, `spring-boot-starter-actuator`.
+- **`domain`:** `BillShockDiagnosis`, `UuidV7`, `InrFormat.gst`.
+- **`security`:** `CurrentCustomer`, `CustomerPrincipal`, `DemoUserProperties`, `PiiScrubber`,
+  `MsisdnMask`; internal `SecurityConfiguration` (HTTP Basic, stateless, in-memory demo users).
+- **`bss`:** `BillingReadModel.account(...)`, `BssUnavailableException`.
+- **`analysis`:** `BillDiffEngine.diffLatest`.
+- **`audit`:** `ToolCallAuditor` plus `NoOpToolCallAuditor` (Q-33).
+- **`tools`:** `BillingTools`, `UsageTools`, `CatalogTools` (the 8 read-only tools), `Amount`,
+  `Untrusted`, `DiffBillsResult`, `ToolMessage`.
+- **`agent`:**
+  - Public: `ChatOrchestrator`, `ChatTurn`, `ChatEvent`, `LlmProperties`, `CostProperties`,
+    `ConversationNotFoundException`
+  - Internal: `DefaultChatOrchestrator`, `LlmConfiguration`, `TurnToolBudget`, `GroundingGate`,
+    `SentenceSplitter`, `DiagnosisGate`, `DiagnosisTool`, `FallbackTemplates`, `SystemPrompt`,
+    `ConversationStore`, `CostMeter`, `TurnState`
+  - Resources: `prompts/system.v1.st` and 26 `templates/fallback/*.en.st` files
+- **`api`:** `ChatController` (SSE), `ProblemDetailsAdvice`.
+- **Tests:**
+  - Unit: `FallbackTemplatesTest` (6 scenarios), `GroundingGateTest`, `SentenceSplitterTest`,
+    `TurnToolBudgetTest`, `CostMeterTest`, `DiagnosisGateTest`, `LlmConfigurationTest`,
+    `UuidV7Test`, `PiiScrubberTest`, `MsisdnMaskTest`, `ToolIdentityRuleTest`
+  - ITs: `ToolsSeedIT` (exact JSON the model sees) and `ChatApiIT` (14 end-to-end cases over
+    HTTP against `FakeAnthropicApi`, a local streaming Messages API that the **real**
+    `AnthropicChatModel` bean calls)
+  - `IntegrationTest` now uses a random port and imports the fake API, so all ITs share one
+    context and none can reach Anthropic
+
+Results:
+- **Summary first:** `summary` arrives before any LLM call, well under 1.5 s (NFR-01a, asserted).
+- **Tools and identity:** they take identity only from the SecurityContext (reflection test,
+  plus a cross-account message test). Another account's conversation id gives 404.
+- **Request shape**, checked on every recorded request:
+  - no `temperature`
+  - `max_tokens` 1024
+  - 3–4 `cache_control` breakpoints, **re-applied on every tool round** (F-14; llm-architecture.md §14)
+- **Fallbacks:** a value violation, 5xx, timeout (no SDK retry), the 9th counted tool call, an
+  empty answer and the prompt canary all end in the template. A label mismatch regenerates
+  once, with `reset` only if sentences were already sent. Action claims are rewritten.
+- **Diagnosis:** the model's diagnosis is accepted only when its money matches the engine;
+  otherwise the engine-built one is stored (`bill_diagnosis.source`).
+- **Metering:** one `llm_call_log` row per round trip; the cost is exact in `BigDecimal`
+  (asserted 0.020230 USD for a scripted 3-round turn).
+- **Observability:** `gen_ai.client.operation`, `spring.ai.chat.client` and `spring.ai.tool`
+  meters are recorded (5a Q-A).
+
+Found and fixed during 5a:
+- **Spring AI 2.0.1 moved the tool loop** out of the chat model into `ToolCallingAdvisor`, which
+  runs tools on a Reactor worker **without the SecurityContext** (F-10, F-11). Our own loop
+  keeps identity on the turn's thread.
+- `AnthropicChatModel.Builder.toolCallingManager` and `ChatClient…toolCallbacks(...)` are
+  deprecated for removal in 3.0; they are not used.
+- Two bugs caught by the ITs: the per-turn tool budget was recreated each round, and the
+  scrubber missed a phone number followed by a comma. Both are fixed and tested.
+
+**Gate review changes (2026-09-25):**
+- **Item 1:** agent.md §4.2 records why ToolContext identity and SecurityContext propagation
+  were rejected, and checks each need point by point. F-11 is corrected (the accessor exists
+  in Spring Security 7.1.1).
+- **Item 5:** retention of 7 months (data-architecture.md §2, §4.6, §10); V4 adds
+  `bill_diagnosis_created_idx`.
+- **Item 6:**
+  - `GroundingGate.CUSTOMER_AMOUNT`: the orchestrator regenerates once with its own correction
+    note, then falls back with reason `CUSTOMER_AMOUNT`
+  - two system-prompt rules: don't repeat customer amounts; never confirm a promised credit
+  - the prompt examples now use amounts that appear nowhere in the seed (they were real
+    customer figures)
+  - tests: 6 unit cases, plus the ITs `anAmountTheCustomerTypedIsRegeneratedOnceWithoutRepeatingIt`
+    and `aPromisedCreditTheModelKeepsRepeatingEndsInTheTemplate`
+- The prompt file is edited in place as `system.v1.st` (not yet deployed; the SHA in the
+  version tag changes).
+
+Deviations and choices to confirm at the gate (agent.md §13):
+1. The orchestrator runs the tool loop (not `ToolCallingAdvisor`); `ChatClient` is still the bean.
+2. The memory store is not a `ChatMemoryRepository` (F-18).
+3. `recordDiagnosis` lives in `agent`, not `tools`.
+4. An unexpected tool error ends the turn (template); it is never shown to the model (F-16).
+5. `bill_diagnosis` is not partitioned (A-103).
+6. The strict verbatim-amount rule has a known limitation (A-106).
+
+Live checks: **deferred — run when API key is available** (owner, 2026-09-25: no API credits
+yet). A first attempt at check 1 found no `.env`. No key was sent, Anthropic returned 401
+twice, and the cost was $0.00, 0 tokens. The rules still apply: show each command before it
+runs, load the key only through `set -a; source .env; set +a`, report tokens and cost after
+each check, and keep the total under $2 (expected < $0.40). `.env` must contain
+`ANTHROPIC_API_KEY_CHAT`, `POSTGRES_*` and `BILLSHOCK_LLM_MODE=LLM`.
+
+| Check | What it settles | Expected | Est. cost | Status |
+|---|---|---|---|---|
+| 1. Q-1 temperature | Sonnet 5 rejects a non-default `temperature` | HTTP 200 without, 400 with `0.2` | < $0.001 | Deferred |
+| 2. NFR-21 cache-read share | Breakpoints work live; share ≥ 60% over a two-turn conversation | share ≥ 60% from turn 2 | ≈ $0.10–0.25 | Deferred |
+| 3. T-6 effort | `effort=medium` vs the default (`high`): output tokens, latency | fewer output tokens, same answer quality | ≈ $0.05 | Deferred |
+
+**Check 1 (Q-1)**, one command:
+
+```bash
+set -a; source .env; set +a; for T in '' ',"temperature":0.2'; do curl -sS https://api.anthropic.com/v1/messages -H "x-api-key: $ANTHROPIC_API_KEY_CHAT" -H 'anthropic-version: 2023-06-01' -H 'content-type: application/json' -d "{\"model\":\"claude-sonnet-5\",\"max_tokens\":16$T,\"messages\":[{\"role\":\"user\",\"content\":\"Reply with OK.\"}]}" -w '\nHTTP %{http_code}\n'; done
+```
+
+**Check 2 (NFR-21):**
+1. Reset the local database. V4 changed, so this is needed anyway; it deletes the local DB
+   volume.
+2. Start the app in terminal A. The demo password is a throwaway local value, overriding `.env`.
+3. Run two turns as `cust1001` in terminal B.
+4. Read the per-round figures.
+
+```bash
+docker compose down -v && docker compose up -d --wait
+```
+
+```bash
+set -a; source .env; set +a; DEMO_USER_PASSWORD=live-check-local ./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
+```
+
+```bash
+curl -sN -u cust1001:live-check-local -H 'Content-Type: application/json' -d '{"message":"Why is my bill so high?"}' http://localhost:8080/api/v1/chat | tee target/live-turn1.sse
+```
+
+```bash
+CID=$(grep -o '"conversationId":"[^"]*"' target/live-turn1.sse | tail -1 | cut -d'"' -f4); curl -sN -u cust1001:live-check-local -H 'Content-Type: application/json' -d "{\"conversationId\":\"$CID\",\"message\":\"Would a roaming pack have helped?\"}" http://localhost:8080/api/v1/chat
+```
+
+```bash
+set -a; source .env; set +a; docker compose exec postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT called_at, input_tokens, cache_write_tokens, cache_read_tokens, output_tokens, cost_usd, latency_ms, outcome FROM llm_call_log ORDER BY called_at" -c "SELECT round(100.0 * sum(cache_read_tokens) / nullif(sum(input_tokens + cache_write_tokens + cache_read_tokens), 0), 1) AS cache_read_pct, sum(cost_usd) AS total_usd FROM llm_call_log"
+```
+
+**Check 3 (T-6):** stop the app in terminal A (Ctrl-C), restart it with `effort=medium`,
+run one turn as `cust1002`, then compare output tokens and latency with that account's
+default-effort turn. Run one default turn as `cust1002` first, with the terminal B command
+below before the restart.
+
+```bash
+set -a; source .env; set +a; DEMO_USER_PASSWORD=live-check-local BILLSHOCK_LLM_CHAT_EFFORT=medium ./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
+```
+
+```bash
+curl -sN -u cust1002:live-check-local -H 'Content-Type: application/json' -d '{"message":"Why is my bill so high?"}' http://localhost:8080/api/v1/chat
+```
+
+```bash
+set -a; source .env; set +a; docker compose exec postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT c.account_id, l.called_at, l.input_tokens, l.cache_read_tokens, l.output_tokens, l.latency_ms, l.cost_usd FROM llm_call_log l JOIN conversation c USING (conversation_id) WHERE c.account_id = 1002 ORDER BY l.called_at"
+```
+
+After each check, record the result here, in llm-architecture.md §3 / §14 and in agent.md
+§11. After check 3, set `billshock.llm.chat.effort` if medium is as good.
+
+Not in 5a (as planned): Haiku ChatClient and evals (5b); Resilience4j retry and circuit breaker
+(5b); rate limiting (7); log masking (5b); the action tools, `escalateToHuman` and the audit
+writer (6a); the chat page and demo script (6a).
 
 ## Next step
 
-Phase 4a gate review changes are applied. The owner confirms the open ₹500 point above
-and A-84 to A-95, and commits on `phase-4a-engines`. Anyone with a local
-database must run `docker compose down -v`, because the V3/V1003 checksums changed. Next:
-**Phase 5a** (agent), **after the owner's go-ahead**.
+Phase 5a gate review changes are applied. The owner:
+- commits on `phase-5a-agent`
+- runs `docker compose down -v` before the next local run (V4 changed)
+- runs the deferred live checks once API credits exist
+
+Next: **Phase 6a** (actions and the demo wrap-up), after approval.
+
+Notes for 6a:
+- Implement `ToolCallAuditor` (Q-33) to write `audit_events`; the hook is already called for
+  every executed and refused tool call.
+- The action tools take the goodwill amount before GST (A-94), get the account from
+  `CurrentCustomer`, and call `GuardrailService.evaluate`. Register them in
+  `LlmConfiguration.chatTools` (sorted by name, so the cached prefix stays stable) and add
+  their progress wording in `DefaultChatOrchestrator.PROGRESS`.
+- The action-claim gate (agent.md §8.1) must then allow claims backed by an `EXECUTED` action
+  in the same turn.
+- *(Done in 5a: the simulation display rule and the `TurnToolBudget` wiring.)*

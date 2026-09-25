@@ -1,0 +1,1 @@
+SMS charges account for $amount$ of the change.

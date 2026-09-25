@@ -1,0 +1,1 @@
+Your plan changed during this bill period, so the rental is split (prorated) between the old and the new plan for the days on each.

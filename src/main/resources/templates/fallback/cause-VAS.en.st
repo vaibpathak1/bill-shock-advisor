@@ -1,0 +1,1 @@
+Value-added service charges (subscriptions from third-party content providers) account for $amount$ of the change.

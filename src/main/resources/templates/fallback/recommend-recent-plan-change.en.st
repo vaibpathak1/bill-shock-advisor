@@ -1,0 +1,1 @@
+Because your plan changed on $date$, a plan comparison is only meaningful from your next full bill.

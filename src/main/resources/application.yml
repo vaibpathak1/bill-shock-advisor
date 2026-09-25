@@ -6,6 +6,9 @@ spring:
       # dev and test run against the in-process mock BSS gateways (A-80).
       dev: mock-bss
       test: mock-bss
+  mvc:
+    problemdetails:
+      enabled: true
   jpa:
     open-in-view: false
     hibernate:
@@ -14,6 +17,12 @@ spring:
     # Outside dev/test, migrations run as a pre-deploy Kubernetes Job, not at startup
     # (SPEC §6, A-82; Phase 11).
     enabled: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
 
 billshock:
   tax:
@@ -59,3 +68,36 @@ billshock:
       max-counted-per-turn: 8
       once-per-turn: [escalateToHuman, recordDiagnosis]
 
+
+  llm:
+    # LLM, or TEMPLATE_ONLY: the global kill switch (ADR-005); no key is read then.
+    mode: ${BILLSHOCK_LLM_MODE:LLM}
+    chat:
+      model: claude-sonnet-5          # config, not code (Q-15)
+      max-tokens: 1024
+      timeout: 30s                    # SDK timeout; maxRetries is fixed at 0 (ADR-008)
+      api-key: ${ANTHROPIC_API_KEY_CHAT:}
+      # temperature: unset on purpose: Sonnet 5 rejects a non-default value (Q-1)
+      # effort / thinking: unset = model default until the 5a live check (T-6)
+      max-round-trips: 9              # llm-architecture.md §9
+      max-input-tokens-per-call: 30000
+      memory-window: 12               # llm-architecture.md §8
+    prompt:
+      version: v1                     # prompts/system.v1.st; rollback = change this (SPEC §8.3)
+      locale: en-IN
+      canary: BSA-REF-7Q2K-91XZ       # never in a reply (llm-architecture.md §7)
+    pricing:
+      # USD per million tokens (A-20, Anthropic pricing page, retrieved 2026-09-25).
+      "[claude-sonnet-5]":
+        input-per-mtok: 2.00
+        cache-write-5m-per-mtok: 2.50
+        cache-read-per-mtok: 0.20
+        output-per-mtok: 10.00
+
+  cost:
+    fx-usd-inr: 88                    # planning rate (A-36)
+    max-per-conversation-inr: 45.00   # NFR-09
+
+  security:
+    demo-users:
+      enabled: false                  # only dev/test (A-97)
