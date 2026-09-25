@@ -250,7 +250,7 @@ measured on the first *released* sentence.
 
 | Budget | Default (config) | Enforcement | On breach |
 |---|---|---|---|
-| Tool calls per turn | **8**, not counting `escalateToHuman` and `recordDiagnosis` (SPEC §4.5; owner decision 2026-09-25) | `TurnToolBudget`, a thin `ToolCallingManager` decorator around `DefaultToolCallingManager`, counts the current turn's calls to every other tool (F-5 explains why the built-in exclusion is not enough). Backstop: the built-in `maxTotalToolCalls(10)` (8 + 1 + 1), `THROW` | 9th counted call → stop the loop; `escalateToHuman` + template answer |
+| Tool calls per turn | **8**, not counting `escalateToHuman` and `recordDiagnosis` (SPEC §4.5; owner decision 2026-09-25) | `TurnToolBudget`, a thin `ToolCallingManager` decorator around `DefaultToolCallingManager`, counts the current turn's calls to every other tool (F-5 explains why the built-in exclusion is not enough). The counting rule itself is the pure `ToolCallBudget` policy in `agent` (built and tested in 4a, Q-29); the decorator that calls it is wired in 5a. Backstop: the built-in `maxTotalToolCalls(10)` (8 + 1 + 1), `THROW` | 9th counted call → stop the loop; `escalateToHuman` + template answer |
 | `escalateToHuman`, `recordDiagnosis` per turn | **At most once each** (owner decision 2026-09-25) | `TurnToolBudget` (backstop: built-in `maxCallsPerTool(name, 1)`) | The repeat call is **not executed**; the tool result says it was already done this turn, and the turn continues (no escalation just because of a duplicate) |
 | LLM round trips per turn | 9 | orchestrator | same |
 | Input tokens per call | 30,000 | estimate before sending (usage from the last call + delta) | Compact memory (§8); if still over, template answer |

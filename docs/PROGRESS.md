@@ -5,7 +5,7 @@
 | 1. Docs I | **Done** (approved 2026-09-25) | PRD, feasibility, capacity estimates, plan and budget, NFRs, assumptions register |
 | 2. Docs II | **Done; review answers Q-14–Q-19 applied** (2026-09-25) | Architecture, ADR-001 to ADR-007, data architecture (with EXPLAIN evidence), scalability, security, LLM architecture, observability |
 | 3a. Foundation (MVP slice) | **Done, approved** (owner, 2026-09-25). Gate-review changes applied; `./mvnw verify` passes | Scope: plan-and-budget §2a |
-| 4a. Deterministic core (MVP slice) | Not started | |
+| 4a. Deterministic core (MVP slice) | **Gate review changes applied** (2026-09-25); `./mvnw verify` passes (112 unit + 94 IT) | Design: `docs/03-development/deterministic-core.md` |
 | 5a. Agent (MVP slice) | Not started | |
 | 6a. Actions (MVP slice) + demo wrap-up | Not started | All 6 scenarios end to end |
 | 3b. Foundation (remainder) | Not started | |
@@ -102,7 +102,7 @@ Headline results:
 
 ## Open questions
 
-All questions up to Q-19 are decided; see the log below. All questions up to Q-26 are decided. Only follow-up actions remain.
+All questions up to Q-31 are decided; see the log below. Only follow-up actions remain, plus the 4a gate items in the Phase 4a section.
 
 | # | Status | Remaining action | When |
 |---|---|---|---|
@@ -132,6 +132,11 @@ All questions up to Q-19 are decided; see the log below. All questions up to Q-2
 | Q-24 | Decided | σ below a configurable floor (₹1.00) counts as a flat history; z is then not applied and only the ratio decides | 4b |
 | Q-25 | Decided | 4b adds the rule "new third-party VAS without double opt-in" (anomaly alert) and the optional rule "first bill after a plan change" (informational notice explaining proration) | 4b |
 | Q-26 | Decided | `AnomalyDetector` stays in 4b; 4a tests the chat column of seed-scenarios.md §5.7, 4b the proactive columns | 4a / 4b |
+| Q-27 | Done (4a) | `RECENT_PLAN_CHANGE` rule built and tested (deterministic-core.md §3.2) | — |
+| Q-28 | Done (4a) | `isd_min` added (V3/V1003 edited in place; **run `docker compose down -v` on a local database**) | — |
+| Q-29 | Partly done | Pure `ToolCallBudget` policy built in 4a; wire the `TurnToolBudget` decorator | Phase 5a |
+| Q-30 | Done (4a) | `InrFormat` in `domain`; the tools use it for GST-labelled strings | Phase 5a (use) |
+| A-86 limitation | Open | VAS refund amount from BSS when the subscription predates the local history | After the MVP slice |
 
 ## Decisions log
 
@@ -197,6 +202,17 @@ the questions raised in the Phase 1 documents.
 | 2026-09-25 | **seed-scenarios.md approved**; data-architecture.md updated with the schema changes; go-ahead for the rest of Phase 3a | Repo owner |
 | 2026-09-25 | **Phase 3a gate review:** both schema deviations accepted (`add_on` wide contents; `tariff_rate.unit_price NUMERIC(14,4)`). A-73: supplier-registered states become a config list (`billshock.tax.supplier-state-codes`); note that large Indian telcos register in each state they serve, so most postpaid bills would be intra-state; the seed keeps `[27]` so the IGST accounts stay covered; FOR TAX REVIEW. README "Run locally" section added | Repo owner |
 | 2026-09-25 | **Phase 3a approved** | Repo owner |
+| 2026-09-25 | **Phase 4a go-ahead.** **Q-27:** option (a): a period with a mid-cycle plan change mixes usage across two plans, so it is not representative for re-rating; `simulatePlans` returns `RECENT_PLAN_CHANGE` with the change date and no ranking; the rule expires after one full bill cycle on the new plan; the seed is not changed | Repo owner |
+| 2026-09-25 | **Q-28:** option (a): add `isd_min` (and `isd_sms` only if the catalogue prices international SMS separately; it does not), editing V3/V1003 in place | Repo owner |
+| 2026-09-25 | **Q-29:** pure counting policy in 4a, decorator wiring in 5a | Repo owner |
+| 2026-09-25 | **Q-30:** Indian digit grouping (en-IN); the formatter is built now as a `domain` utility | Repo owner |
+| 2026-09-25 | **Q-31:** one combined 4a gate: design note plus code, reviewed together | Repo owner |
+| 2026-09-25 | 4a addition 1: `GuardrailContext` is always built server-side from read models, never from LLM tool arguments; stated in deterministic-core.md §4.1 and tested (a request cannot pass facts that bypass the read-model lookup) | Repo owner |
+| 2026-09-25 | 4a addition 2: VAS refund assumption notes that a subscription activated before the local history needs the full refund amount from BSS; recorded as a limitation (A-86) | Repo owner |
+| 2026-09-25 | **4a gate review:** deviations 1, 2, 3, 5 and 6 accepted | Repo owner |
+| 2026-09-25 | 4a gate item 4 (changed): VAS refunds are exempt from the goodwill percentage and prior-credit rules, **not from the absolute limits**: above ₹2,000 incl. GST → escalate, as for goodwill. **No money-out action may be uncapped.** Implemented as `MoneyOutCap` (config `billshock.guardrails.money-out-escalate-above-inr`), with boundary tests | Repo owner |
+| 2026-09-25 | 4a gate item 7: A-94 with Q-20 confirmed: thresholds are evaluated on the GST-inclusive amount, which the chain computes itself from the before-GST input with the bill-level rule; tests `ThresholdsUseTheGstInclusiveAmount` | Repo owner |
+| 2026-09-25 | Phase 3a committed and merged to `main` as `0bc7d15`; 4a is on branch `phase-4a-engines` | Repo owner |
 | 2026-09-25 | Phase 2 answer 7: A-58 to A-65 accepted. A-63 limitation documented (usage up to the previous day; no in-trip real-time alerts in v1; real-time usage events as a future enhancement) | Repo owner |
 
 ## Notes for the Phase 3a session
@@ -340,9 +356,123 @@ Not in 3a (as planned):
   totals. The host-`psql` command was not run, because there is no host psql on this
   machine.
 
+## Phase 4a progress (2026-09-25)
+
+**Status: built, at the gate.** `./mvnw verify` passes: 105 unit tests (was 28) and 94
+integration tests (was 63). The design note and code are reviewed together (Q-31).
+
+Files (all uncommitted; the owner commits):
+- **New doc:** `docs/03-development/deterministic-core.md`: exact definitions of the diff,
+  simulator, guardrail chain, tool-call budget and formatter.
+- **Updated docs:**
+  - `assumptions.md`: new §9 with A-84 to A-95
+  - `seed-scenarios.md`: §4 example corrected and 1004 exception noted; §5.2 and §7.3
+    decided; §9 ISD daily rule
+  - `data-architecture.md` §4.3: `isd_min`
+  - `architecture.md` §4: `actions` may use `analysis`
+  - `llm-architecture.md` §9: `ToolCallBudget`
+- **Schema (edited in place, 3a answer 3):**
+  - `V3`: `isd_min` on `usage_period`, `usage_daily` and the `usage_as_used` view
+  - `V1003`: 1006's ISD minutes, and the daily split
+- **`domain`:** `InrFormat` (en-IN grouping, GST labels); `Money.average`, `negate`, `max`,
+  `isPositive`, `isZero`.
+- **`bss`:**
+  - `CatalogReadModel` (JDBC over plan/tariff/add-on) and `RoamingBandProperties`
+  - `BillingReadModel.latestBill`, `.roamingUsage` (new JPA entity for
+    `usage_period_roaming`)
+  - `UsagePeriodSummary.isdMin`
+- **`analysis`:** `BillDiffEngine` + `BillDiff`, `CauseGroup`, `DuplicateChargeDetector`,
+  `PlanSimulator` + `PlanSimulation`, `UsageRater`, `AnalysisProperties`.
+- **`actions`:**
+  - Public: `GuardrailService`, `ActionRequest` (7 request types), `GuardrailDecision`,
+    `GuardrailProperties`
+  - Internal `actions.guardrail`: context, factory, chain and 7 checks
+- **`agent`:** `ToolCallBudget` + `ToolCallBudgetProperties`.
+- **Config** (`application.yml`): `billshock.catalog.roaming-bands`, `billshock.analysis.*`,
+  `billshock.guardrails.*`, `billshock.agent.tool-calls.*`.
+- **Tests:**
+  - Unit: `BillDiffEngineTest` (22), `PlanSimulatorTest` (15), `GuardrailServiceTest`
+    (22), `ToolCallBudgetTest`, `InrFormatTest`, `MoneyTest` (average). They use in-memory
+    seed fixtures (`SeedScenarioFixtures`) and a shared expectations table
+    (`SeedExpectations`).
+  - ITs: `AnalysisSeedIT`, `GuardrailSeedIT`, `CatalogReadModelIT`, plus new cases in
+    `BillingReadModelIT` and `SeedDataIT` (ISD minutes × ₹6.00 = voice charge).
+
+Results on the seed (unit and IT agree):
+- **Chat column of seed-scenarios.md §5.7:** all 6 accounts match exactly (total, baseline,
+  excess, %, ratio, verdict). 1006 is `NORMAL`, with no causes.
+- **§7 causes:** all 5 flagged accounts give one cause, with exact excl./GST/incl. amounts;
+  both rounding adjustments are ₹0.00.
+- **Simulator:**
+  - 1002: `PP_499` / `PP_599` / `PP_699` and `DATA_10GB`, as in §5.2
+  - 1001: `IR_GCC_7D`, saving ₹876.00 / ₹1,033.68 incl. GST
+  - 1003, 1005, 1006: no saving
+  - 1004: `RECENT_PLAN_CHANGE` (1 Sep); its October bill is simulated normally (tested)
+- **Guardrails:**
+  - Astro Daily refund: ₹196.00 + ₹35.28 = ₹231.28, 4 line items
+  - Cricket Scores refund: rejected (opt-in present)
+  - Goodwill on the duplicate: rejected (`USE_DISPUTE`); the dispute is ₹706.82
+  - Boundaries are exact at 15% (₹437.90 on 1001), ₹500.00 / ₹500.01 and ₹2,000.00 /
+    ₹2,000.01
+  - Another account's line item or subscription: rejected
+- **Addition 1:** reflection tests show that the requests carry only choices and that the
+  only public entry point is `evaluate(AccountId, ActionRequest)`. A recording proxy shows
+  that every read-model and TMF622 lookup used the caller's account only.
+
+Found and fixed during 4a:
+- `VasCheck` put `CONFIRMATION_REQUIRED` on a rejected refund; caught by a test and fixed
+  in the code.
+- The seed-scenarios.md §4 example "1006 on `PP_399` = ₹952.96" was off by ₹1 (it is ₹951.96).
+  It was an illustration, not a test value. Corrected.
+- The same §4 statement ("no cheaper plan fits except 1002") is false for 1004 September.
+  Q-27 handles this, and the doc now says so.
+
+Deviations and choices to confirm at the gate:
+1. **Module map:** `actions` now depends on `analysis`, so the goodwill guardrail reuses
+   `DuplicateChargeDetector` instead of a copy. There is no cycle; `ModularityTests` passes;
+   architecture.md §4 is updated.
+2. **Config key:** the autonomy level is `billshock.guardrails.autonomy-level`, not the
+   `billshock.actions.autonomy-level` from the 4a plan.
+3. **Findings run on every bill,** whatever the verdict: a duplicate on a bill with a normal
+   total is still reported. Causes are shown only for `MEANINGFUL_INCREASE`.
+4. **A VAS refund is not subject to the goodwill limits** (it is policy-mandated). A
+   refund above ₹2,000 would still only need the customer's confirmation.
+5. **`catalog` read model** uses `JdbcClient` rather than JPA entities (small, read-only
+   tables).
+6. **`latestBill`** has no partition pruning: a backward index scan per partition with
+   LIMIT 1. Fine at MVP scale; revisit with the retention job (3b).
+
+Not in 4a (as planned): `AnomalyDetector` and the proactive columns of §5.7 (4b); the JaCoCo
+gate (4b); `ProposedAction` persistence and executed-credit history (6a); the
+`TurnToolBudget` decorator and the tools that call these engines (5a).
+
+**Gate review changes (2026-09-25):**
+- **Item 4:**
+  - New `MoneyOutCap` (package `actions.guardrail`), used by `GoodwillCreditCheck` and
+    `VasCheck`.
+  - The cap moved from `billshock.guardrails.goodwill.escalate-above-inr` to
+    `billshock.guardrails.money-out-escalate-above-inr`.
+  - The reason code `CREDIT_ABOVE_ESCALATION_LIMIT` is renamed
+    `MONEY_OUT_ABOVE_ESCALATION_LIMIT`.
+  - Tests (`VasRefundCap`): a refund of ₹1,694.92 + ₹305.08 = ₹2,000.00 is proposed;
+    ₹2,000.01 is escalated; ₹531.00 with a prior credit and above 15%/₹500 is proposed with no
+    supervisor flag.
+- **Item 7:** the chain computes GST itself on the before-GST input
+  (deterministic-core.md §4.5, A-94). Tests (`ThresholdsUseTheGstInclusiveAmount`):
+  - 1,694.93 before GST → ₹2,000.01 → escalated
+  - the same ₹1,694.92 → ₹2,000.00 intra-state (proposed) but ₹2,000.01 inter-state
+    (escalated)
+  - 423.74 → ₹500.01 → supervisor
+  - 1001: 400.00 → ₹472.00 > ₹437.90 → supervisor
+- **Mutation check** (sources restored afterwards):
+  - removing the VAS cap fails 1 test
+  - comparing goodwill thresholds before GST fails 9 tests
+- **Open:** the owner stated only the ₹2,000 cap for VAS refunds. The ₹500 supervisor limit
+  does not apply to refunds. Confirm.
+
 ## Next step
 
-Phase 3a is approved. The owner commits (commands printed in the session). Next:
-**Phase 4a** (BillDiffEngine with the chat threshold, PlanSimulator, scenario
-guardrails, and unit tests with exact BigDecimal assertions against seed-scenarios.md),
-**after the owner's go-ahead**.
+Phase 4a gate review changes are applied. The owner confirms the open ₹500 point above
+and A-84 to A-95, and commits on `phase-4a-engines`. Anyone with a local
+database must run `docker compose down -v`, because the V3/V1003 checksums changed. Next:
+**Phase 5a** (agent), **after the owner's go-ahead**.

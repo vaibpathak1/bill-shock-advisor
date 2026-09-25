@@ -23,3 +23,39 @@ billshock:
     supplier-state-codes:
       - "27"
     gst-rate: 18.00             # A-72
+
+  catalog:
+    # Roaming band per country (A-90). The catalogue prices roaming by band; usage is recorded
+    # by country. A roaming country missing here makes the simulator return NOT_SIMULATABLE.
+    roaming-bands:
+      GCC: [AE, SA, QA, KW, BH, OM]
+      WORLD: [US, GB, SG, TH, MY, FR, DE, AU, CA, JP]
+
+  analysis:
+    chat:
+      # "Meaningful increase" in chat (Q-22, A-83): excess >= Rs 100 AND >= 10% of the
+      # 3-bill baseline, on GST-inclusive totals. Separate from billshock.anomaly.* (4b).
+      min-excess-inr: 100.00
+      min-excess-pct: 10
+    simulator:
+      max-plan-options: 3       # Q-21
+
+  guardrails:
+    # SPEC §4.5; deterministic-core.md §4. Never shown to the LLM. GST-inclusive (Q-20),
+    # limits inclusive (A-84).
+    autonomy-level: 1           # MVP slice: fixed at Level 1 (ADR-004)
+    history-months: 6           # local bill history searched for cited line items (7 bills)
+    # Every money-out action (goodwill credit, VAS refund) above this is escalated; none is uncapped.
+    money-out-escalate-above-inr: 2000.00
+    goodwill:
+      auto-approval-max-inr: 500.00
+      auto-approval-max-bill-share-pct: 15
+      prior-credit-lookback-months: 6
+
+  agent:
+    tool-calls:
+      # llm-architecture.md §9: 8 counted calls per turn; these two are excluded from the
+      # count and allowed once each per turn.
+      max-counted-per-turn: 8
+      once-per-turn: [escalateToHuman, recordDiagnosis]
+

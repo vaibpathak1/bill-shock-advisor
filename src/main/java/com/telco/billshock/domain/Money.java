@@ -2,6 +2,7 @@ package com.telco.billshock.domain;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.Collection;
 import java.util.Objects;
 
 /**
@@ -40,6 +41,20 @@ public record Money(BigDecimal amount) implements Comparable<Money> {
         return new Money(value.setScale(SCALE, ROUNDING));
     }
 
+    /**
+     * The mean of the amounts, as one division rounded HALF_EVEN to 2 decimal places (no
+     * intermediate rounding).
+     *
+     * @throws IllegalArgumentException if there are no amounts
+     */
+    public static Money average(Collection<Money> amounts) {
+        if (amounts.isEmpty()) {
+            throw new IllegalArgumentException("The average of no amounts is undefined");
+        }
+        BigDecimal sum = amounts.stream().map(Money::amount).reduce(BigDecimal.ZERO, BigDecimal::add);
+        return new Money(sum.divide(BigDecimal.valueOf(amounts.size()), SCALE, ROUNDING));
+    }
+
     public Money plus(Money other) {
         return new Money(amount.add(other.amount));
     }
@@ -60,6 +75,22 @@ public record Money(BigDecimal amount) implements Comparable<Money> {
 
     public boolean isNegative() {
         return amount.signum() < 0;
+    }
+
+    public boolean isPositive() {
+        return amount.signum() > 0;
+    }
+
+    public boolean isZero() {
+        return amount.signum() == 0;
+    }
+
+    public Money negate() {
+        return new Money(amount.negate());
+    }
+
+    public static Money max(Money a, Money b) {
+        return a.compareTo(b) >= 0 ? a : b;
     }
 
     @Override

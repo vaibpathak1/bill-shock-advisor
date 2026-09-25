@@ -3,6 +3,7 @@ package com.telco.billshock.domain;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
@@ -43,5 +44,15 @@ class MoneyTest {
         assertThat(Money.of("2474.00").plus(Money.of("445.32"))).isEqualTo(Money.of("2919.32"));
         assertThat(Money.of("2919.32").minus(Money.of("824.82"))).isEqualTo(Money.of("2094.50"));
         assertThat(Money.of("1.00").minus(Money.of("2.00")).isNegative()).isTrue();
+    }
+
+    @Test
+    void averagesWithOneHalfEvenRounding() {
+        // seed-scenarios.md §5.2: (470.82 + 470.82 + 543.32) / 3 = 494.9866... -> 494.99
+        assertThat(Money.average(List.of(Money.of("470.82"), Money.of("470.82"), Money.of("543.32"))))
+            .isEqualTo(Money.of("494.99"));
+        // A tie: 0.01 / 2 = 0.005 -> 0.00 (HALF_EVEN), not 0.01.
+        assertThat(Money.average(List.of(Money.of("0.00"), Money.of("0.01")))).isEqualTo(Money.of("0.00"));
+        assertThatIllegalArgumentException().isThrownBy(() -> Money.average(List.of()));
     }
 }

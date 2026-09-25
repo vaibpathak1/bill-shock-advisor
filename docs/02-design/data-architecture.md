@@ -148,8 +148,10 @@ that `PlanSimulator` can re-rate only with daily data (A-55).
 
 ### 4.3 Usage (option C, ADR-007)
 - Wide columns in `usage_daily` and `usage_period`: `data_mb, data_charge, voice_min,
-  voice_charge, sms_count, sms_charge, roaming_data_mb, roaming_voice_min,
-  roaming_sms_count, roaming_charge`. `usage_period` adds `source_row_count, rolled_up_at`.
+  isd_min, voice_charge, sms_count, sms_charge, roaming_data_mb, roaming_voice_min,
+  roaming_sms_count, roaming_charge`. `voice_min` is domestic minutes only; `isd_min`
+  holds international minutes, so the simulator can re-rate ISD against each plan's
+  allowance; `voice_charge` is all VOICE line items (Q-28, A-89; added in 4a). `usage_period` adds `source_row_count, rolled_up_at`.
   `usage_daily` adds `usage_period` (the cycle the usage belongs to).
 - Roaming tables: `country_code char(2)`, `first_day`, `last_day`, quantities, `charge`.
 - `usage_ingest_batch (batch_id, source, checksum, status, row_count, received_at,

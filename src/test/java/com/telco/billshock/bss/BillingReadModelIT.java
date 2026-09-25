@@ -74,4 +74,36 @@ class BillingReadModelIT {
             assertThat(usage.roamingCharge()).isEqualTo(Money.of("1775.00"));
         });
     }
+
+    @Test
+    void theLatestBillIsSeptember() {
+        assertThat(readModel.latestBill(AccountId.of(1004))).get()
+            .extracting(BillSummary::billPeriod, BillSummary::billId)
+            .containsExactly(SEPTEMBER, 10042609L);
+        assertThat(readModel.latestBill(AccountId.of(9999))).isEmpty();
+    }
+
+    @Test
+    void roamingUsageByCountry() {
+        assertThat(readModel.roamingUsage(AccountId.of(1001), SEPTEMBER)).singleElement().satisfies(r -> {
+            assertThat(r.countryCode()).isEqualTo("AE");
+            assertThat(r.firstDay()).isEqualTo(LocalDate.of(2026, 8, 12));
+            assertThat(r.lastDay()).isEqualTo(LocalDate.of(2026, 8, 18));
+            assertThat(r.dataMb()).isEqualByComparingTo("550");
+            assertThat(r.voiceMin()).isEqualByComparingTo("10");
+            assertThat(r.smsCount()).isEqualTo(3);
+            assertThat(r.charge()).isEqualTo(Money.of("1775.00"));
+        });
+        assertThat(readModel.roamingUsage(AccountId.of(1001), BillPeriod.of(2026, 8))).isEmpty();
+    }
+
+    @Test
+    void isdMinutesAreSeparateFromDomesticVoice() {
+        assertThat(readModel.usage(AccountId.of(1006), SEPTEMBER)).singleElement().satisfies(usage -> {
+            assertThat(usage.isdMin()).isEqualByComparingTo("4");
+            assertThat(usage.voiceMin()).isEqualByComparingTo("586");
+            assertThat(usage.voiceCharge()).isEqualTo(Money.of("24.00"));
+        });
+        assertThat(readModel.usage(AccountId.of(1001), SEPTEMBER).getFirst().isdMin()).isEqualByComparingTo("0");
+    }
 }

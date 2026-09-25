@@ -178,18 +178,29 @@ class SeedDataIT {
     }
 
     @Test
+    void isdMinutesAtTheIsdRateEqualTheVoiceCharges() {
+        // Q-28: voice_min is domestic (unlimited on every seed plan); only ISD minutes are charged, at Rs 6.00/min.
+        assertThat(jdbc.sql("SELECT count(*) FROM usage_period WHERE isd_min * 6.00 <> voice_charge")
+            .query(Long.class).single()).isZero();
+        assertThat(jdbc.sql("SELECT sum(isd_min) FROM usage_period WHERE account_id = 1006").query(BigDecimal.class)
+            .single()).isEqualByComparingTo("19");
+        assertThat(jdbc.sql("SELECT count(*) FROM usage_period WHERE account_id <> 1006 AND isd_min <> 0")
+            .query(Long.class).single()).isZero();
+    }
+
+    @Test
     void dailyRowsExistOnlyForAugustAndSeptemberAndAddUpToThePeriodRows() {
         assertThat(jdbc.sql("SELECT DISTINCT billed_period FROM usage_daily ORDER BY 1").query(LocalDate.class).list())
             .containsExactly(LocalDate.of(2026, 8, 1), LocalDate.of(2026, 9, 1));
         assertThat(jdbc.sql("""
                 SELECT count(*) FROM usage_period u
                 JOIN (SELECT account_id, billed_period, sum(data_mb) dm, sum(data_charge) dc, sum(voice_min) vm,
-                             sum(voice_charge) vc, sum(sms_count) sc, sum(sms_charge) sch, sum(roaming_data_mb) rd,
+                             sum(isd_min) im, sum(voice_charge) vc, sum(sms_count) sc, sum(sms_charge) sch, sum(roaming_data_mb) rd,
                              sum(roaming_voice_min) rv, sum(roaming_sms_count) rs, sum(roaming_charge) rc
                       FROM usage_daily GROUP BY account_id, billed_period) d USING (account_id, billed_period)
-                WHERE (u.data_mb, u.data_charge, u.voice_min, u.voice_charge, u.sms_count, u.sms_charge,
+                WHERE (u.data_mb, u.data_charge, u.voice_min, u.isd_min, u.voice_charge, u.sms_count, u.sms_charge,
                        u.roaming_data_mb, u.roaming_voice_min, u.roaming_sms_count, u.roaming_charge)
-                      IS DISTINCT FROM (d.dm, d.dc, d.vm, d.vc, d.sc, d.sch, d.rd, d.rv, d.rs, d.rc)""")
+                      IS DISTINCT FROM (d.dm, d.dc, d.vm, d.im, d.vc, d.sc, d.sch, d.rd, d.rv, d.rs, d.rc)""")
             .query(Long.class).single()).isZero();
         // One daily row per day of each usage period (12 account-periods).
         assertThat(jdbc.sql("""

@@ -23,11 +23,14 @@ class JpaBillingReadModel implements BillingReadModel {
     private final BillRepository bills;
     private final LineItemRepository lineItems;
     private final UsagePeriodRepository usagePeriods;
+    private final UsagePeriodRoamingRepository roaming;
 
-    JpaBillingReadModel(BillRepository bills, LineItemRepository lineItems, UsagePeriodRepository usagePeriods) {
+    JpaBillingReadModel(BillRepository bills, LineItemRepository lineItems, UsagePeriodRepository usagePeriods,
+            UsagePeriodRoamingRepository roaming) {
         this.bills = bills;
         this.lineItems = lineItems;
         this.usagePeriods = usagePeriods;
+        this.roaming = roaming;
     }
 
     @Override
@@ -42,6 +45,11 @@ class JpaBillingReadModel implements BillingReadModel {
     public Optional<BillSummary> bill(AccountId accountId, BillPeriod billPeriod) {
         return bills.findByAccountIdAndBillPeriod(accountId.value(), billPeriod.firstDay())
             .map(JpaBillingReadModel::toSummary);
+    }
+
+    @Override
+    public Optional<BillSummary> latestBill(AccountId accountId) {
+        return bills.findFirstByAccountIdOrderByBillPeriodDesc(accountId.value()).map(JpaBillingReadModel::toSummary);
     }
 
     @Override
@@ -64,6 +72,17 @@ class JpaBillingReadModel implements BillingReadModel {
             .toList();
     }
 
+    @Override
+    public List<RoamingUsage> roamingUsage(AccountId accountId, BillPeriod billedPeriod) {
+        return roaming
+            .findByAccountIdAndBilledPeriodOrderByUsagePeriodAscCountryCodeAsc(accountId.value(), billedPeriod.firstDay())
+            .stream()
+            .map(r -> new RoamingUsage(new BillPeriod(r.getBilledPeriod()), new BillPeriod(r.getUsagePeriod()),
+                    r.getCountryCode(), r.getFirstDay(), r.getLastDay(), r.getDataMb(), r.getVoiceMin(),
+                    r.getSmsCount(), Money.of(r.getCharge())))
+            .toList();
+    }
+
     private static BillSummary toSummary(BillEntity b) {
         return new BillSummary(b.getBillId(), AccountId.of(b.getAccountId()), new BillPeriod(b.getBillPeriod()),
                 b.getPeriodStart(), b.getPeriodEnd(), b.getBillDate(), b.getPlaceOfSupply(),
@@ -81,7 +100,7 @@ class JpaBillingReadModel implements BillingReadModel {
     private static UsagePeriodSummary toUsage(UsagePeriodEntity u) {
         return new UsagePeriodSummary(AccountId.of(u.getAccountId()), new BillPeriod(u.getBilledPeriod()),
                 new BillPeriod(u.getUsagePeriod()), u.getDataMb(), Money.of(u.getDataCharge()), u.getVoiceMin(),
-                Money.of(u.getVoiceCharge()), u.getSmsCount(), Money.of(u.getSmsCharge()), u.getRoamingDataMb(),
+                u.getIsdMin(), Money.of(u.getVoiceCharge()), u.getSmsCount(), Money.of(u.getSmsCharge()), u.getRoamingDataMb(),
                 u.getRoamingVoiceMin(), u.getRoamingSmsCount(), Money.of(u.getRoamingCharge()));
     }
 

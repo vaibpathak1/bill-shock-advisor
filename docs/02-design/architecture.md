@@ -98,7 +98,7 @@ flowchart TB
 | `bss` | Gateway interfaces + mock/real adapters (TMF678/635/620/622/621); ingest (bills, usage feed, batch ledger, roll-up, reconciliation); read models for bills and usage | Adapter/Gateway | `domain`, `audit` | both |
 | `analysis` | `BillDiffEngine`, `AnomalyDetector` (Strategy per rule), `PlanSimulator`; diagnosis store and cache | Strategy | `domain`, `bss` | both |
 | `policy` | RAG ingestion and retrieval | — | `domain` | chat-api (ingest: admin) |
-| `actions` | ProposedAction workflow, guardrail chain, executors, idempotency, autonomy flags | Chain of Responsibility, Strategy (executors) | `domain`, `bss`, `audit`, `security` | chat-api |
+| `actions` | ProposedAction workflow, guardrail chain, executors, idempotency, autonomy flags | Chain of Responsibility, Strategy (executors) | `domain`, `bss`, `analysis` (duplicate-charge rule, 4a), `audit`, `security` | chat-api |
 | `tools` | `@Tool` classes: Billing, Usage, Catalog, Action, Policy | — | `domain`, `analysis`, `bss`, `actions`, `policy`, `security`, `audit` | chat-api |
 | `agent` | ChatClient beans, prompts, orchestration, grounding gates, memory, fallback templates, cost metering | Template Method (fallback) | `domain`, `tools`, `analysis`, `security`, `audit` | both (proactive explanation service) |
 | `proactive` | Kafka consumers, screening, diagnosis orchestration, notifications, jobs | Idempotent Consumer | `domain`, `analysis`, `agent`, `bss`, `audit` | proactive-worker |

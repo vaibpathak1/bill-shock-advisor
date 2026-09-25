@@ -22,11 +22,20 @@ public interface BillingReadModel {
 
     Optional<BillSummary> bill(AccountId accountId, BillPeriod billPeriod);
 
+    /**
+     * The account's most recent bill: the "current" bill, independent of today's date
+     * (seed-scenarios.md §1).
+     */
+    Optional<BillSummary> latestBill(AccountId accountId);
+
     /** All line items of one bill, TAX lines included, in line order. */
     List<LineItem> lineItems(AccountId accountId, BillPeriod billPeriod);
 
     /** Usage aggregates billed on one bill, one row per usage period (query Q3). */
     List<UsagePeriodSummary> usage(AccountId accountId, BillPeriod billedPeriod);
+
+    /** Roaming usage by country billed on one bill ({@code usage_period_roaming}, ADR-007). */
+    List<RoamingUsage> roamingUsage(AccountId accountId, BillPeriod billedPeriod);
 
     record BillSummary(long billId, AccountId accountId, BillPeriod billPeriod,
             LocalDate periodStart, LocalDate periodEnd, LocalDate billDate,
@@ -45,9 +54,23 @@ public interface BillingReadModel {
             Money amount, String taxComponent, BigDecimal taxRate, String externalRef) {
     }
 
+    /**
+     * @param voiceMin domestic minutes only
+     * @param isdMin international (ISD) minutes (Q-28)
+     * @param voiceCharge all VOICE line items of the period: domestic and ISD
+     */
     record UsagePeriodSummary(AccountId accountId, BillPeriod billedPeriod, BillPeriod usagePeriod,
-            BigDecimal dataMb, Money dataCharge, BigDecimal voiceMin, Money voiceCharge,
+            BigDecimal dataMb, Money dataCharge, BigDecimal voiceMin, BigDecimal isdMin, Money voiceCharge,
             int smsCount, Money smsCharge, BigDecimal roamingDataMb, BigDecimal roamingVoiceMin,
             int roamingSmsCount, Money roamingCharge) {
+    }
+
+    /**
+     * @param countryCode ISO 3166-1 alpha-2
+     * @param firstDay first day with roaming usage in the country
+     * @param lastDay last day with roaming usage in the country
+     */
+    record RoamingUsage(BillPeriod billedPeriod, BillPeriod usagePeriod, String countryCode, LocalDate firstDay,
+            LocalDate lastDay, BigDecimal dataMb, BigDecimal voiceMin, int smsCount, Money charge) {
     }
 }

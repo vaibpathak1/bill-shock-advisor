@@ -38,6 +38,9 @@ class UsagePeriodEntity {
     @Column(name = "voice_min")
     private BigDecimal voiceMin;
 
+    @Column(name = "isd_min")
+    private BigDecimal isdMin;
+
     @Column(name = "voice_charge")
     private BigDecimal voiceCharge;
 
@@ -84,6 +87,10 @@ class UsagePeriodEntity {
 
     BigDecimal getVoiceMin() {
         return voiceMin;
+    }
+
+    BigDecimal getIsdMin() {
+        return isdMin;
     }
 
     BigDecimal getVoiceCharge() {

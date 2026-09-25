@@ -51,6 +51,14 @@ INSERT INTO usage_period (account_id, billed_period, usage_period, data_mb, data
     (1006, DATE '2026-08-01', DATE '2026-08-01', 71680, 0.00, 578, 18.00, 43, 0.00, 0, 0, 0, 0.00, 31, TIMESTAMPTZ '2026-08-01 05:00:00+05:30'),
     (1006, DATE '2026-09-01', DATE '2026-09-01', 68608, 0.00, 586, 24.00, 44, 0.00, 0, 0, 0, 0.00, 31, TIMESTAMPTZ '2026-09-01 05:00:00+05:30');
 
+-- ISD minutes (Q-28): account 1006 only, at Rs 6.00/min, so isd_min x 6.00 = voice_charge
+-- (the VOICE line items). voice_min holds domestic minutes only.
+UPDATE usage_period u
+   SET isd_min = v.isd_min
+  FROM (VALUES (DATE '2026-03-01', 2), (DATE '2026-04-01', 3), (DATE '2026-05-01', 1), (DATE '2026-06-01', 4),
+               (DATE '2026-07-01', 2), (DATE '2026-08-01', 3), (DATE '2026-09-01', 4)) AS v (billed_period, isd_min)
+ WHERE u.account_id = 1006 AND u.billed_period = v.billed_period;
+
 -- Account 1001's UAE trip, 12-18 Aug 2026, billed on the September bill.
 INSERT INTO usage_period_roaming (account_id, billed_period, usage_period, country_code, first_day, last_day,
                                   data_mb, voice_min, sms_count, charge) VALUES
@@ -66,7 +74,7 @@ INSERT INTO usage_ingest_batch (batch_id, source, checksum, status, row_count, r
 --     with the remainder on the last day;
 --   * data overage is charged in date order from the day the included allowance runs out,
 --     at the seed rate of Rs 0.02/MB (A-74), so the daily charges add up to data_charge;
---   * other domestic charges (ISD voice) are placed on the last day;
+--   * ISD minutes and their charges are placed on the last day;
 --   * roaming is spread over the trip days only, rated at the GCC pay-per-use rates (A-75).
 -- SeedDataIT checks that the daily rows add up to the period rows exactly.
 DO $$
@@ -105,9 +113,10 @@ BEGIN
             END IF;
             over_mb := greatest(0, cum_before + data_day - greatest(allowance, cum_before));
             INSERT INTO usage_daily (account_id, billed_period, usage_date, source_batch_id, usage_period,
-                                     data_mb, data_charge, voice_min, voice_charge, sms_count, sms_charge)
+                                     data_mb, data_charge, voice_min, isd_min, voice_charge, sms_count, sms_charge)
             VALUES (p.account_id, p.billed_period, usage_day, 'SEED-' || to_char(p.billed_period, 'YYYY-MM'), p.usage_period,
                     data_day, round(over_mb * 0.02, 2), voice_day,
+                    CASE WHEN d = n - 1 THEN p.isd_min ELSE 0 END,
                     CASE WHEN d = n - 1 THEN p.voice_charge ELSE 0 END,
                     sms_day, CASE WHEN d = n - 1 THEN p.sms_charge ELSE 0 END);
             cum_before := cum_before + data_day;

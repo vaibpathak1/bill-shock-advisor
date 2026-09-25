@@ -20,8 +20,9 @@ CREATE TABLE usage_period (
     usage_period      date          NOT NULL CHECK (extract(day FROM usage_period) = 1),
     data_mb           numeric(14,3) NOT NULL DEFAULT 0,
     data_charge       numeric(14,2) NOT NULL DEFAULT 0,
-    voice_min         numeric(14,3) NOT NULL DEFAULT 0,
-    voice_charge      numeric(14,2) NOT NULL DEFAULT 0,
+    voice_min         numeric(14,3) NOT NULL DEFAULT 0,   -- domestic minutes only
+    isd_min           numeric(14,3) NOT NULL DEFAULT 0,   -- international (ISD) minutes (Q-28)
+    voice_charge      numeric(14,2) NOT NULL DEFAULT 0,   -- all VOICE line items: domestic + ISD
     sms_count         integer       NOT NULL DEFAULT 0,
     sms_charge        numeric(14,2) NOT NULL DEFAULT 0,
     roaming_data_mb   numeric(14,3) NOT NULL DEFAULT 0,
@@ -59,8 +60,9 @@ CREATE TABLE usage_daily (
     usage_period      date          NOT NULL CHECK (extract(day FROM usage_period) = 1),
     data_mb           numeric(14,3) NOT NULL DEFAULT 0,
     data_charge       numeric(14,2) NOT NULL DEFAULT 0,
-    voice_min         numeric(14,3) NOT NULL DEFAULT 0,
-    voice_charge      numeric(14,2) NOT NULL DEFAULT 0,
+    voice_min         numeric(14,3) NOT NULL DEFAULT 0,   -- domestic minutes only
+    isd_min           numeric(14,3) NOT NULL DEFAULT 0,   -- international (ISD) minutes (Q-28)
+    voice_charge      numeric(14,2) NOT NULL DEFAULT 0,   -- all VOICE line items: domestic + ISD
     sms_count         integer       NOT NULL DEFAULT 0,
     sms_charge        numeric(14,2) NOT NULL DEFAULT 0,
     roaming_data_mb   numeric(14,3) NOT NULL DEFAULT 0,
@@ -102,6 +104,7 @@ SELECT account_id,
        sum(data_mb)           AS data_mb,
        sum(data_charge)       AS data_charge,
        sum(voice_min)         AS voice_min,
+       sum(isd_min)           AS isd_min,
        sum(voice_charge)      AS voice_charge,
        sum(sms_count)         AS sms_count,
        sum(sms_charge)        AS sms_charge,

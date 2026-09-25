@@ -12,4 +12,10 @@ interface BillRepository extends Repository<BillEntity, BillKey> {
     List<BillEntity> findByAccountIdAndBillPeriodBetweenOrderByBillPeriod(long accountId, LocalDate from, LocalDate to);
 
     Optional<BillEntity> findByAccountIdAndBillPeriod(long accountId, LocalDate billPeriod);
+
+    /**
+     * The latest bill. No partition pruning: a backward index scan per partition under a
+     * Merge Append with LIMIT 1, which stops after the first row.
+     */
+    Optional<BillEntity> findFirstByAccountIdOrderByBillPeriodDesc(long accountId);
 }

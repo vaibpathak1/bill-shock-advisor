@@ -130,7 +130,11 @@ everywhere except the BSS gateway call (security.md).
 Data volumes were chosen so that **no cheaper plan fits** any customer except where the
 scenario needs one (customer 1002). This stops the simulator from reporting a "saving"
 that would count as an invented issue. For example, 1006 at 67 GB on `PP_399` would cost
-₹952.96, against ₹499.00 on its current plan. Domestic voice and SMS are within
+₹951.96 before ISD (₹975.96 with its 4 ISD minutes), against ₹499.00 (₹523.00) on its
+current plan. *(Corrected in 4a: this example said ₹952.96; 27 GB × 1,024 MB × ₹0.02 =
+₹552.96, plus ₹399.00 = ₹951.96. It was an illustration, not a test value.)* **Exception
+found in 4a:** 1004's September usage (39 GB) fits `PP_399`. That period mixes two plans, so
+the simulator does not rank it (Q-27, deterministic-core.md §3.2). Domestic voice and SMS are within
 allowance every month: fixed plausible values, listed in the seed SQL, with no charge.
 
 Ids (A-77): `bill_id = account_id × 10000 + YYMM` (for example `10012609`);
@@ -185,8 +189,8 @@ seed must support.
 | `PP_299` (worse) | 872.44 | −104.80 | 1,029.48 |
 
   The top 3 plans are `PP_499`, `PP_599` and `PP_699`; the best add-on is `DATA_10GB`.
-  Whether the simulator also ranks add-ons and multiples of an add-on is decided in 4a
-  (decision Q-21: plans ranked top 3; best single add-on returned separately; no multiples in v1).
+  Decision Q-21: plans ranked top 3; the best single add-on returned separately; no
+  multiples in v1. Implemented in 4a (deterministic-core.md §3.5).
 
 ### 5.3 Customer 1003: third-party VAS without double opt-in (intra-state)
 
@@ -356,9 +360,11 @@ fixtures under `src/main/resources/bss-fixtures/` (A-80):
    copies verbatim. The grounding check verifies that each amount and label came from a
    tool result, regenerates once on a label mismatch, then falls back to the template
    (llm-architecture.md §7, §10).
-3. The customer 1004 simulation straddles two plans within one period. For explanation-only
-   scenarios the simulator runs on the new plan from the next full period; this is
-   decided in 4a.
+3. The customer 1004 simulation straddles two plans within one period. **Decided (Q-27):**
+   a period with a mid-cycle plan change mixes usage across two plans, so it is not
+   representative for re-rating. `simulatePlans` returns `RECENT_PLAN_CHANGE` with the
+   change date and no ranking. The rule expires after one full bill cycle on the new plan;
+   after that the period is simulated normally (deterministic-core.md §3.2).
 
 ## 8. Proposed schema changes (edited in place in V1–V6, answer 3)
 
@@ -390,8 +396,9 @@ with them.
 **Daily rows (generation rule, A-81):** each monthly quantity is split evenly across the
 days of the usage period in whole units, with the remainder on the last day. Account
 1001's roaming falls only on 12–18 Aug. Overage charges are attributed in date order,
-starting from the day the included allowance runs out. Other domestic charges (ISD voice)
-are placed on the last day of the period. *(As built: `V1003__seed_usage.sql`.)*
+starting from the day the included allowance runs out. ISD minutes (`isd_min`, Q-28, added
+in 4a) and their charges are placed on the last day of the period. *(As built:
+`V1003__seed_usage.sql`.)*
 
 ## 10. Assumptions introduced (A-71 to A-83; also in assumptions.md §8)
 
