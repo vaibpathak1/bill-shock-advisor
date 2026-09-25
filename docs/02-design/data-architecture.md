@@ -66,7 +66,7 @@ Rows at 1x are steady state. The module is the Spring Modulith owner (architectu
 
 | Table | Module | Purpose | Primary key | Partitioned by | Retention | PII | Rows at 1x |
 |---|---|---|---|---|---|---|---|
-| `account` | `bss` | Local account reference (cycle day, MSISDN for BSS calls) | `account_id` | — | While active + 7 months | MSISDN | 10 M |
+| `account` | `bss` | Local account reference (cycle day, GST state, MSISDN for BSS calls) | `account_id` | — | While active + 7 months | MSISDN | 10 M |
 | `plan`, `add_on`, `tariff_rate` | `bss` | Catalogue replica (TMF620) | `plan_id` / `add_on_id` / `(plan_id, usage_type, band)` | — | Versioned (`valid_from/to`) | — | < 10 k |
 | `bill` | `bss` | Bill headers (TMF678 replica) | `(bill_period, bill_id)`, unique `(account_id, bill_period)` | `bill_period`, monthly | 7 partitions | Personal | 70 M |
 | `bill_line_item` | `bss` | Line items, incl. `usage_period` for late charges | `(bill_period, line_item_id)` | `bill_period`, monthly | 7 partitions | Personal | 1.05 B |
@@ -104,24 +104,46 @@ Rows at 1x are steady state. The module is the Spring Modulith owner (architectu
 
 ## 4. Key tables in detail
 
-### 4.1 `bill` and `bill_line_item`
+### 4.1 `account`, `bill` and `bill_line_item`
+*(Updated in Phase 3a with the approved schema changes from
+[seed-scenarios.md](../03-development/seed-scenarios.md) §8. The GST model is A-72.)*
+
+- `account`: `account_id, msisdn, bill_cycle_day, gst_state_code char(2)` (place of
+  supply: the GST state code of the billing address), `status, created_at`.
 - `bill`: `bill_id, account_id, bill_period, period_start, period_end, bill_date,
-  subtotal, tax_total, total, status, source_version, generated_at`. GST is carried as
-  separate `TAX` line items (18%, SPEC §4.10). The `bill.total` check `= subtotal +
-  tax_total` is enforced at ingest.
+  place_of_supply char(2), supply_type (INTRA | INTER), subtotal, tax_total, total,
+  status, source_version, generated_at`. `place_of_supply` and `supply_type` are a
+  snapshot, because the account's state can change later.
+- **GST is computed at bill level** (A-72): tax on `subtotal`. Intra-state: two `TAX` lines,
+  CGST 9% + SGST 9%. Inter-state: one `TAX` line, IGST 18%. Each component is rounded
+  HALF_EVEN to 2 dp. Checks enforced at ingest (and by CHECK constraints where they are
+  row-local): `total = subtotal + tax_total`; `subtotal` = Σ non-tax lines; `tax_total` =
+  Σ TAX lines.
 - `bill_line_item`: `line_item_id, bill_id, bill_period, account_id, category`
   (`RENTAL | DATA | VOICE | SMS | ROAMING | VAS | PRORATION | ADJUSTMENT | TAX | CREDIT |
   OTHER`), `description` (untrusted text, security.md §5), `usage_period` (set when the
-  charge is for an earlier cycle: late roaming, ADR-007), `subscription_id`, `quantity`,
-  `unit`, `amount`, `tax_amount`, `external_ref`.
+  charge is for an earlier cycle: late roaming, ADR-007), `service_period_start`,
+  `service_period_end` (nullable; needed for proration and duplicate detection),
+  `subscription_id`, `quantity`, `unit`, `amount`, `tax_component (CGST | SGST | IGST)`
+  and `tax_rate numeric(5,2)` (set on TAX lines only, and required there by a CHECK),
+  `external_ref`. **There is no per-line `tax_amount`**, because tax is bill-level.
 - Line items are **authoritative for money**. Usage aggregates explain quantities
   (ADR-007 §6).
+- Config: `billshock.tax.supplier-state-codes` (the states in which the operator holds a GST
+  registration; seed: `[27]`, A-73), `billshock.tax.gst-rate=18.00`. A bill is intra-state
+  when its place of supply is in that list.
 
 ### 4.2 Catalogue
 `plan (plan_id, code, name, monthly_rental, valid_from, valid_to, attributes jsonb)`,
-`tariff_rate (plan_id, usage_type, band, included_units, unit_price, day_based boolean, …)`,
-`add_on (add_on_id, code, price, usage_type, units, validity_days, country_group)`. The
-`day_based` flag marks tariffs that `PlanSimulator` can re-rate only with daily data (A-55).
+`tariff_rate (plan_id, usage_type, band, included_units, unit_price, unit, day_based)`,
+`add_on (add_on_id, code, name, price, data_mb, voice_min, sms_count, validity,
+validity_days, country_group, valid_from, valid_to)`. The `day_based` flag marks tariffs
+that `PlanSimulator` can re-rate only with daily data (A-55).
+- *(Phase 3a, as built in V1)*: `included_units NULL` means unlimited. `unit_price` is a
+  rate (₹ per unit), not an amount, so it is `NUMERIC(14,4)`; every charge computed from it
+  is rounded to `NUMERIC(14,2)`. Add-ons bundle several allowances (a roaming pack has
+  data, voice and SMS), so their contents are wide columns instead of one
+  `usage_type`/`units` pair. `validity` is `DAYS` (with `validity_days`) or `BILL_CYCLE`.
 **A-61:** the v1 catalogue has no time-of-day tariffs.
 
 ### 4.3 Usage (option C, ADR-007)

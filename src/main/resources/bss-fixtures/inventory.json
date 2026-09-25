@@ -1,0 +1,164 @@
+{
+  "accounts": {
+    "1001": {
+      "products": [
+        {
+          "subscriptionId": "SUB-1001-PLAN",
+          "type": "PLAN",
+          "code": "PP_699",
+          "name": "PP_699",
+          "provider": null,
+          "price": "699.00",
+          "activatedOn": "2025-11-01",
+          "activationChannel": "RETAIL",
+          "optInEvidence": null
+        },
+        {
+          "subscriptionId": "SUB-1001-IR",
+          "type": "SERVICE",
+          "code": "INTL_ROAMING",
+          "name": "International roaming (pay per use)",
+          "provider": null,
+          "price": "0.00",
+          "activatedOn": "2026-08-10",
+          "activationChannel": "APP",
+          "optInEvidence": null
+        }
+      ],
+      "orders": []
+    },
+    "1002": {
+      "products": [
+        {
+          "subscriptionId": "SUB-1002-PLAN",
+          "type": "PLAN",
+          "code": "PP_399",
+          "name": "PP_399",
+          "provider": null,
+          "price": "399.00",
+          "activatedOn": "2025-06-01",
+          "activationChannel": "APP",
+          "optInEvidence": null
+        }
+      ],
+      "orders": []
+    },
+    "1003": {
+      "products": [
+        {
+          "subscriptionId": "SUB-1003-PLAN",
+          "type": "PLAN",
+          "code": "PP_499",
+          "name": "PP_499",
+          "provider": null,
+          "price": "499.00",
+          "activatedOn": "2025-04-01",
+          "activationChannel": "RETAIL",
+          "optInEvidence": null
+        },
+        {
+          "subscriptionId": "SUB-1003-VAS-CRICKET",
+          "type": "VAS",
+          "code": "CRICKET_SCORES",
+          "name": "Cricket Scores",
+          "provider": "Demo VAS Provider 1",
+          "price": "29.50",
+          "activatedOn": "2026-02-10",
+          "activationChannel": "SMS",
+          "optInEvidence": {
+            "firstConsentAt": "2026-02-10T09:14:00+05:30",
+            "firstConsentChannel": "SMS",
+            "confirmationAt": "2026-02-10T09:16:00+05:30",
+            "confirmationChannel": "SMS"
+          }
+        },
+        {
+          "subscriptionId": "SUB-1003-VAS-ASTRO",
+          "type": "VAS",
+          "code": "ASTRO_DAILY",
+          "name": "Astro Daily",
+          "provider": "Demo VAS Provider 2",
+          "price": "49.00",
+          "activatedOn": "2026-08-15",
+          "activationChannel": "WAP",
+          "optInEvidence": {
+            "firstConsentAt": "2026-08-15T21:03:00+05:30",
+            "firstConsentChannel": "WAP",
+            "confirmationAt": null,
+            "confirmationChannel": null
+          }
+        }
+      ],
+      "orders": []
+    },
+    "1004": {
+      "products": [
+        {
+          "subscriptionId": "SUB-1004-PLAN",
+          "type": "PLAN",
+          "code": "PP_699",
+          "name": "PP_699",
+          "provider": null,
+          "price": "699.00",
+          "activatedOn": "2026-09-01",
+          "activationChannel": "APP",
+          "optInEvidence": null
+        }
+      ],
+      "orders": [
+        {
+          "orderId": "ORD-1004-0001",
+          "action": "PLAN_CHANGE",
+          "fromCode": "PP_399",
+          "toCode": "PP_699",
+          "effectiveDate": "2026-09-01",
+          "channel": "APP",
+          "status": "COMPLETED"
+        }
+      ]
+    },
+    "1005": {
+      "products": [
+        {
+          "subscriptionId": "SUB-1005-PLAN",
+          "type": "PLAN",
+          "code": "PP_599",
+          "name": "PP_599",
+          "provider": null,
+          "price": "599.00",
+          "activatedOn": "2025-02-21",
+          "activationChannel": "RETAIL",
+          "optInEvidence": null
+        }
+      ],
+      "orders": []
+    },
+    "1006": {
+      "products": [
+        {
+          "subscriptionId": "SUB-1006-PLAN",
+          "type": "PLAN",
+          "code": "PP_499",
+          "name": "PP_499",
+          "provider": null,
+          "price": "499.00",
+          "activatedOn": "2025-08-01",
+          "activationChannel": "APP",
+          "optInEvidence": null
+        },
+        {
+          "subscriptionId": "SUB-1006-ISD",
+          "type": "SERVICE",
+          "code": "ISD",
+          "name": "International calling (pay per use)",
+          "provider": null,
+          "price": "0.00",
+          "activatedOn": "2025-08-01",
+          "activationChannel": "APP",
+          "optInEvidence": null
+        }
+      ],
+      "orders": []
+    }
+  }
+}

@@ -5,7 +5,7 @@
 | Status | Draft for review (Phase 2) |
 | Date | 2026-09-25 |
 | Spec reference | SPEC.md §2.1, §3, §4.1, §4.2, §4.7 |
-| Decisions | [ADR-001](adr/001-modular-monolith-two-deployables.md) · [ADR-002](adr/002-postgresql-system-of-record.md) · [ADR-003](adr/003-llm-never-does-arithmetic.md) · [ADR-004](adr/004-hitl-proposed-action-autonomy-ladder.md) · [ADR-005](adr/005-llm-provider-fallback-data-residency.md) (pending owner) · [ADR-006](adr/006-kafka-vs-application-events.md) · [ADR-007](adr/007-usage-storage-layout-late-usage.md) |
+| Decisions | [ADR-001](adr/001-modular-monolith-two-deployables.md) · [ADR-002](adr/002-postgresql-system-of-record.md) · [ADR-003](adr/003-llm-never-does-arithmetic.md) · [ADR-004](adr/004-hitl-proposed-action-autonomy-ladder.md) · [ADR-005](adr/005-llm-provider-fallback-data-residency.md) (pending owner) · [ADR-006](adr/006-kafka-vs-application-events.md) · [ADR-007](adr/007-usage-storage-layout-late-usage.md) · [ADR-008](adr/008-framework-versions-boot4-spring-ai2.md) |
 | Related | [data-architecture.md](data-architecture.md) · [scalability.md](scalability.md) · [security.md](security.md) · [llm-architecture.md](llm-architecture.md) · [observability.md](observability.md) · [nfr.md](nfr.md) |
 
 Diagrams are Mermaid **flowcharts in C4 style** (A-65), because Mermaid's native C4 syntax
@@ -60,7 +60,7 @@ flowchart TB
       console["Care-agent console<br/>(Angular, later)"]
     end
     subgraph bsa[Bill Shock Advisor]
-      chat["<b>chat-api</b><br/>Spring Boot 3, Java 21<br/>REST + SSE, agent (Sonnet 5), tools,<br/>actions, audit, security"]
+      chat["<b>chat-api</b><br/>Spring Boot 4, Java 21<br/>REST + SSE, agent (Sonnet 5), tools,<br/>actions, audit, security"]
       worker["<b>proactive-worker</b><br/>same image, profile proactive-worker<br/>Kafka consumers, anomaly screening,<br/>diagnosis (Haiku-tier model), jobs"]
       pg[("PostgreSQL 16 + pgvector<br/>primary + read replica")]
       redis[("Redis 7<br/>L2 cache, rate limits")]

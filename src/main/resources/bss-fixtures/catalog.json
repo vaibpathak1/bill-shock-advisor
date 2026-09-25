@@ -1,0 +1,71 @@
+{
+  "plans": [
+    {
+      "code": "PP_299",
+      "name": "Postpaid 299",
+      "monthlyRental": "299.00"
+    },
+    {
+      "code": "PP_399",
+      "name": "Postpaid 399",
+      "monthlyRental": "399.00"
+    },
+    {
+      "code": "PP_499",
+      "name": "Postpaid 499",
+      "monthlyRental": "499.00"
+    },
+    {
+      "code": "PP_599",
+      "name": "Postpaid 599",
+      "monthlyRental": "599.00"
+    },
+    {
+      "code": "PP_699",
+      "name": "Postpaid 699",
+      "monthlyRental": "699.00"
+    },
+    {
+      "code": "PP_999",
+      "name": "Postpaid 999",
+      "monthlyRental": "999.00"
+    },
+    {
+      "code": "PP_1199",
+      "name": "Postpaid 1199 Unlimited",
+      "monthlyRental": "1199.00"
+    },
+    {
+      "code": "PP_1499",
+      "name": "Postpaid 1499 Unlimited",
+      "monthlyRental": "1499.00"
+    }
+  ],
+  "addOns": [
+    {
+      "code": "DATA_10GB",
+      "name": "Data add-on 10 GB",
+      "price": "150.00"
+    },
+    {
+      "code": "DATA_25GB",
+      "name": "Data add-on 25 GB",
+      "price": "325.00"
+    },
+    {
+      "code": "IR_GCC_7D",
+      "name": "GCC roaming pack 7 days",
+      "price": "899.00"
+    },
+    {
+      "code": "IR_GCC_30D",
+      "name": "GCC roaming pack 30 days",
+      "price": "2199.00"
+    },
+    {
+      "code": "IR_WORLD_10D",
+      "name": "World roaming pack 10 days",
+      "price": "2999.00"
+    }
+  ]
+}

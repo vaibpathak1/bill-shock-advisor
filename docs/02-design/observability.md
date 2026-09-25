@@ -35,7 +35,7 @@ leave the region, but the default is not to ship it anywhere else.
 
 ## 2. Metrics catalogue
 
-**From Spring AI 1.1.8** (observation names checked in the sources, 2026-09-25):
+**From Spring AI 2.0.1** (observation names checked in the sources, 2026-09-25; unchanged from 1.1.8, llm-architecture.md F-8):
 `gen_ai.client.operation` (timer; tags such as `gen_ai.request.model`,
 `gen_ai.response.model`, `gen_ai.operation.name`) and `gen_ai.client.token.usage` (tag
 `gen_ai.token.type`: input/output/total), plus tool-call observations (`spring.ai.tool`).

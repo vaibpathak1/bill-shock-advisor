@@ -1,0 +1,380 @@
+{
+  "sessions": {
+    "1001": {
+      "2026-09": [
+        {
+          "usageDate": "2026-08-12",
+          "kind": "ROAMING_DATA",
+          "countryCode": "AE",
+          "quantity": "78",
+          "unit": "MB",
+          "charge": "156.00"
+        },
+        {
+          "usageDate": "2026-08-12",
+          "kind": "ROAMING_VOICE",
+          "countryCode": "AE",
+          "quantity": "1",
+          "unit": "MIN",
+          "charge": "60.00"
+        },
+        {
+          "usageDate": "2026-08-13",
+          "kind": "ROAMING_DATA",
+          "countryCode": "AE",
+          "quantity": "78",
+          "unit": "MB",
+          "charge": "156.00"
+        },
+        {
+          "usageDate": "2026-08-13",
+          "kind": "ROAMING_VOICE",
+          "countryCode": "AE",
+          "quantity": "1",
+          "unit": "MIN",
+          "charge": "60.00"
+        },
+        {
+          "usageDate": "2026-08-14",
+          "kind": "ROAMING_DATA",
+          "countryCode": "AE",
+          "quantity": "78",
+          "unit": "MB",
+          "charge": "156.00"
+        },
+        {
+          "usageDate": "2026-08-14",
+          "kind": "ROAMING_VOICE",
+          "countryCode": "AE",
+          "quantity": "1",
+          "unit": "MIN",
+          "charge": "60.00"
+        },
+        {
+          "usageDate": "2026-08-15",
+          "kind": "ROAMING_DATA",
+          "countryCode": "AE",
+          "quantity": "78",
+          "unit": "MB",
+          "charge": "156.00"
+        },
+        {
+          "usageDate": "2026-08-15",
+          "kind": "ROAMING_VOICE",
+          "countryCode": "AE",
+          "quantity": "1",
+          "unit": "MIN",
+          "charge": "60.00"
+        },
+        {
+          "usageDate": "2026-08-16",
+          "kind": "ROAMING_DATA",
+          "countryCode": "AE",
+          "quantity": "78",
+          "unit": "MB",
+          "charge": "156.00"
+        },
+        {
+          "usageDate": "2026-08-16",
+          "kind": "ROAMING_VOICE",
+          "countryCode": "AE",
+          "quantity": "1",
+          "unit": "MIN",
+          "charge": "60.00"
+        },
+        {
+          "usageDate": "2026-08-17",
+          "kind": "ROAMING_DATA",
+          "countryCode": "AE",
+          "quantity": "78",
+          "unit": "MB",
+          "charge": "156.00"
+        },
+        {
+          "usageDate": "2026-08-17",
+          "kind": "ROAMING_VOICE",
+          "countryCode": "AE",
+          "quantity": "1",
+          "unit": "MIN",
+          "charge": "60.00"
+        },
+        {
+          "usageDate": "2026-08-18",
+          "kind": "ROAMING_DATA",
+          "countryCode": "AE",
+          "quantity": "82",
+          "unit": "MB",
+          "charge": "164.00"
+        },
+        {
+          "usageDate": "2026-08-18",
+          "kind": "ROAMING_VOICE",
+          "countryCode": "AE",
+          "quantity": "4",
+          "unit": "MIN",
+          "charge": "240.00"
+        },
+        {
+          "usageDate": "2026-08-18",
+          "kind": "ROAMING_SMS",
+          "countryCode": "AE",
+          "quantity": "3",
+          "unit": "SMS",
+          "charge": "75.00"
+        }
+      ]
+    },
+    "1002": {
+      "2026-09": [
+        {
+          "usageDate": "2026-08-06",
+          "kind": "DATA",
+          "countryCode": null,
+          "quantity": "1915",
+          "unit": "MB",
+          "charge": "0.00"
+        },
+        {
+          "usageDate": "2026-08-07",
+          "kind": "DATA",
+          "countryCode": null,
+          "quantity": "1915",
+          "unit": "MB",
+          "charge": "0.00"
+        },
+        {
+          "usageDate": "2026-08-08",
+          "kind": "DATA",
+          "countryCode": null,
+          "quantity": "1915",
+          "unit": "MB",
+          "charge": "0.00"
+        },
+        {
+          "usageDate": "2026-08-09",
+          "kind": "DATA",
+          "countryCode": null,
+          "quantity": "1915",
+          "unit": "MB",
+          "charge": "0.00"
+        },
+        {
+          "usageDate": "2026-08-10",
+          "kind": "DATA",
+          "countryCode": null,
+          "quantity": "1915",
+          "unit": "MB",
+          "charge": "0.00"
+        },
+        {
+          "usageDate": "2026-08-11",
+          "kind": "DATA",
+          "countryCode": null,
+          "quantity": "1915",
+          "unit": "MB",
+          "charge": "0.00"
+        },
+        {
+          "usageDate": "2026-08-12",
+          "kind": "DATA",
+          "countryCode": null,
+          "quantity": "1915",
+          "unit": "MB",
+          "charge": "0.00"
+        },
+        {
+          "usageDate": "2026-08-13",
+          "kind": "DATA",
+          "countryCode": null,
+          "quantity": "1915",
+          "unit": "MB",
+          "charge": "0.00"
+        },
+        {
+          "usageDate": "2026-08-14",
+          "kind": "DATA",
+          "countryCode": null,
+          "quantity": "1915",
+          "unit": "MB",
+          "charge": "0.00"
+        },
+        {
+          "usageDate": "2026-08-15",
+          "kind": "DATA",
+          "countryCode": null,
+          "quantity": "1915",
+          "unit": "MB",
+          "charge": "0.00"
+        },
+        {
+          "usageDate": "2026-08-16",
+          "kind": "DATA",
+          "countryCode": null,
+          "quantity": "1915",
+          "unit": "MB",
+          "charge": "0.00"
+        },
+        {
+          "usageDate": "2026-08-17",
+          "kind": "DATA",
+          "countryCode": null,
+          "quantity": "1915",
+          "unit": "MB",
+          "charge": "0.00"
+        },
+        {
+          "usageDate": "2026-08-18",
+          "kind": "DATA",
+          "countryCode": null,
+          "quantity": "1915",
+          "unit": "MB",
+          "charge": "0.00"
+        },
+        {
+          "usageDate": "2026-08-19",
+          "kind": "DATA",
+          "countryCode": null,
+          "quantity": "1915",
+          "unit": "MB",
+          "charge": "0.00"
+        },
+        {
+          "usageDate": "2026-08-20",
+          "kind": "DATA",
+          "countryCode": null,
+          "quantity": "1915",
+          "unit": "MB",
+          "charge": "0.00"
+        },
+        {
+          "usageDate": "2026-08-21",
+          "kind": "DATA",
+          "countryCode": null,
+          "quantity": "1915",
+          "unit": "MB",
+          "charge": "0.00"
+        },
+        {
+          "usageDate": "2026-08-22",
+          "kind": "DATA",
+          "countryCode": null,
+          "quantity": "1915",
+          "unit": "MB",
+          "charge": "0.00"
+        },
+        {
+          "usageDate": "2026-08-23",
+          "kind": "DATA",
+          "countryCode": null,
+          "quantity": "1915",
+          "unit": "MB",
+          "charge": "0.00"
+        },
+        {
+          "usageDate": "2026-08-24",
+          "kind": "DATA",
+          "countryCode": null,
+          "quantity": "1915",
+          "unit": "MB",
+          "charge": "0.00"
+        },
+        {
+          "usageDate": "2026-08-25",
+          "kind": "DATA",
+          "countryCode": null,
+          "quantity": "1915",
+          "unit": "MB",
+          "charge": "0.00"
+        },
+        {
+          "usageDate": "2026-08-26",
+          "kind": "DATA",
+          "countryCode": null,
+          "quantity": "1915",
+          "unit": "MB",
+          "charge": "0.00"
+        },
+        {
+          "usageDate": "2026-08-27",
+          "kind": "DATA",
+          "countryCode": null,
+          "quantity": "1915",
+          "unit": "MB",
+          "charge": "23.40"
+        },
+        {
+          "usageDate": "2026-08-28",
+          "kind": "DATA",
+          "countryCode": null,
+          "quantity": "1915",
+          "unit": "MB",
+          "charge": "38.30"
+        },
+        {
+          "usageDate": "2026-08-29",
+          "kind": "DATA",
+          "countryCode": null,
+          "quantity": "1915",
+          "unit": "MB",
+          "charge": "38.30"
+        },
+        {
+          "usageDate": "2026-08-30",
+          "kind": "DATA",
+          "countryCode": null,
+          "quantity": "1915",
+          "unit": "MB",
+          "charge": "38.30"
+        },
+        {
+          "usageDate": "2026-08-31",
+          "kind": "DATA",
+          "countryCode": null,
+          "quantity": "1915",
+          "unit": "MB",
+          "charge": "38.30"
+        },
+        {
+          "usageDate": "2026-09-01",
+          "kind": "DATA",
+          "countryCode": null,
+          "quantity": "1915",
+          "unit": "MB",
+          "charge": "38.30"
+        },
+        {
+          "usageDate": "2026-09-02",
+          "kind": "DATA",
+          "countryCode": null,
+          "quantity": "1915",
+          "unit": "MB",
+          "charge": "38.30"
+        },
+        {
+          "usageDate": "2026-09-03",
+          "kind": "DATA",
+          "countryCode": null,
+          "quantity": "1915",
+          "unit": "MB",
+          "charge": "38.30"
+        },
+        {
+          "usageDate": "2026-09-04",
+          "kind": "DATA",
+          "countryCode": null,
+          "quantity": "1915",
+          "unit": "MB",
+          "charge": "38.30"
+        },
+        {
+          "usageDate": "2026-09-05",
+          "kind": "DATA",
+          "countryCode": null,
+          "quantity": "1942",
+          "unit": "MB",
+          "charge": "38.84"
+        }
+      ]
+    }
+  }
+}

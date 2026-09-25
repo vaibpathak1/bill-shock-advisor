@@ -3,8 +3,8 @@
 | Phase | Status | Notes |
 |---|---|---|
 | 1. Docs I | **Done** (approved 2026-09-25) | PRD, feasibility, capacity estimates, plan and budget, NFRs, assumptions register |
-| 2. Docs II | **Done; review answers Q-14–Q-19 applied** (2026-09-25); waiting for the go-ahead for 3a | Architecture, ADR-001 to ADR-007, data architecture (with EXPLAIN evidence), scalability, security, LLM architecture, observability |
-| 3a. Foundation (MVP slice) | Not started | Scope: plan-and-budget §2a |
+| 2. Docs II | **Done; review answers Q-14–Q-19 applied** (2026-09-25) | Architecture, ADR-001 to ADR-007, data architecture (with EXPLAIN evidence), scalability, security, LLM architecture, observability |
+| 3a. Foundation (MVP slice) | **Done, approved** (owner, 2026-09-25). Gate-review changes applied; `./mvnw verify` passes | Scope: plan-and-budget §2a |
 | 4a. Deterministic core (MVP slice) | Not started | |
 | 5a. Agent (MVP slice) | Not started | |
 | 6a. Actions (MVP slice) + demo wrap-up | Not started | All 6 scenarios end to end |
@@ -102,12 +102,12 @@ Headline results:
 
 ## Open questions
 
-All questions up to Q-19 are decided; see the log below. Only follow-up actions remain.
+All questions up to Q-19 are decided; see the log below. All questions up to Q-26 are decided. Only follow-up actions remain.
 
 | # | Status | Remaining action | When |
 |---|---|---|---|
 | Q-1 | Decided; live check deferred | Documented behaviour used (llm-architecture.md §3). Live call to `claude-sonnet-5` with and without temperature, **only with the owner's approval** | Phase 5a |
-| Q-2 | Decided | Spring AI 1.1.8 sources show caching support (llm-architecture.md F-1). Re-check in the version actually pinned; **stop and tell the owner if unsupported** | Phase 3a, before pinning |
+| Q-2 | Done | Caching verified in the pinned Spring AI 2.0.1 sources (llm-architecture.md F-1, ADR-008) | — |
 | Q-3 | Decided (with Q-7) | — | — |
 | Q-4 | Done | Both SLIs and the hourly alert are in `observability.md` §1, §6 | — |
 | Q-5 | Done | Used in the NFR-04 SLI and alert (`observability.md`) and the KEDA sizing (`scalability.md` §3) | — |
@@ -125,6 +125,13 @@ All questions up to Q-19 are decided; see the log below. Only follow-up actions 
 | Q-17 | Decided | Implement `NUMERIC(14,6)` USD metering with prices per MTok in config | Phase 5a |
 | Q-18 | Decided | No artificial padding; extend the proactive prompt only with quality-improving content; revisit with the successor model's cache minimum | Phase 7 |
 | Q-19 | Decided | — | — |
+| Q-20 | Decided | Credits/refunds include GST; goodwill thresholds on the GST-inclusive amount; FOR TAX REVIEW (A-72) | Implement in 4a (guardrails) / 6a (actions) |
+| Q-21 | Decided | Plans top 3 + best single add-on; no multiples | 4a |
+| Q-22 | Decided | Chat threshold ≥ ₹100 and ≥ 10%, separate from the proactive rule (≥ 1.8x or z > 2.5); expectations in seed-scenarios.md §5.7 (A-83) | 4a (chat); detector per Q-26 |
+| Q-23 | Decided | Per-cause excl. GST / GST / incl. GST; replies always state GST and name a cause by its GST-inclusive figure | 4a (engine), 5a (prompt, templates, grounding gate) |
+| Q-24 | Decided | σ below a configurable floor (₹1.00) counts as a flat history; z is then not applied and only the ratio decides | 4b |
+| Q-25 | Decided | 4b adds the rule "new third-party VAS without double opt-in" (anomaly alert) and the optional rule "first bill after a plan change" (informational notice explaining proration) | 4b |
+| Q-26 | Decided | `AnomalyDetector` stays in 4b; 4a tests the chat column of seed-scenarios.md §5.7, 4b the proactive columns | 4a / 4b |
 
 ## Decisions log
 
@@ -172,13 +179,35 @@ the questions raised in the Phase 1 documents.
 | 2026-09-25 | **Q-17:** `NUMERIC(14,6)` USD for LLM cost metering accepted; token prices stored per million tokens (llm-architecture.md §12) | Repo owner |
 | 2026-09-25 | **Q-18:** no artificial prompt padding; extend the fixed proactive prompt only with content that improves quality; accept ~$720/month otherwise; revisit with the successor Haiku-tier model's cache minimum | Repo owner |
 | 2026-09-25 | **Q-19:** updated figures accepted (₹75.6 lakh/month at 1x, ₹20.6 per conversation, corrected 3x total ₹208.5 lakh) | Repo owner |
+| 2026-09-25 | **Phase 3a go-ahead.** 3a answer 1: seed uses fixed calendar months, bills March to September 2026 (September = current), partitions 2026-01 to 2027-12 | Repo owner |
+| 2026-09-25 | 3a answer 2: 7 bills per customer (current + 6 prior) | Repo owner |
+| 2026-09-25 | 3a answer 3: create all slice tables in 3a. **Rule: until the first real deployment, edit V1–V6 in place instead of adding new migrations for changes.** (Anyone with a local database runs `docker compose down -v` or `flyway clean` after such an edit, since the checksums change) | Repo owner |
+| 2026-09-25 | 3a answer 4: extra gate inside 3a: `seed-scenarios.md` is reviewed before any seed SQL is written | Repo owner |
+| 2026-09-25 | 3a addition B: GST as on an Indian telecom invoice: tax on the bill-level taxable value; CGST 9% + SGST 9% intra-state, IGST 18% inter-state (configurable per account state); each component HALF_EVEN to 2 dp. Recorded as A-72 (FOR TAX REVIEW) | Repo owner |
+| 2026-09-25 | **3a version decision (addition A): Stack B**: Spring Boot **4.1.1**, Spring AI **2.0.1**, Spring Modulith **2.1.1**. Boot 3.5.x and Spring AI 1.1.x OSS support ended on 2026-06-30 (spring.io). Anthropic SDK retries = 0, so Resilience4j is the only retry layer; move to Boot 4.2 / Spring AI 2.1 after GA. ADR-008; SPEC §3 and AGENTS.md updated | Repo owner |
+| 2026-09-25 | Seed review round 1: tool-call cap excludes `escalateToHuman` and `recordDiagnosis` from the 8, **each at most once per turn** (implemented with a `TurnToolBudget` decorator, because Spring AI's `excludeToolFromLimit` still counts toward the total; the built-in limit is a backstop) | Repo owner |
+| 2026-09-25 | **Q-20:** credits and refunds include GST; goodwill thresholds apply to the GST-inclusive amount; FOR TAX REVIEW | Repo owner |
+| 2026-09-25 | **Q-21:** `simulatePlans` ranks plans (top 3) plus the best single add-on; no multiples | Repo owner |
+| 2026-09-25 | **Q-22:** chat "meaningful increase" = ≥ ₹100 and ≥ 10%, documented as separate from the proactive `AnomalyDetector` rule (≥ 1.8x baseline or z > 2.5); per-scenario expectations table in seed-scenarios.md §5.7 | Repo owner |
+| 2026-09-25 | **Q-23:** causes before GST plus a GST component; replies always say whether an amount includes GST and name a cause by its GST-inclusive figure (SPEC §4.6, PRD US-DIA-01, llm-architecture.md §10) | Repo owner |
+| 2026-09-25 | **GST labels in replies (revises the grounding rule):** tools return pre-formatted, GST-labelled amount strings ("₹2,832.00 incl. GST"; "₹599 + GST" for catalogue prices); the model copies them verbatim; the grounding check verifies each amount and its label came from a tool result; on a label mismatch, regenerate once, then fall back to the template. SPEC §4.6, llm-architecture.md §6, §7, §10 updated | Repo owner |
+| 2026-09-25 | **Q-24:** option (a), plus σ below a small configurable floor (₹1.00) counts as flat | Repo owner |
+| 2026-09-25 | **Q-25:** add the 4b rule "new third-party VAS without double opt-in"; also an optional 4b rule "first bill after a plan change" → informational notification explaining proration (not an anomaly alert) | Repo owner |
+| 2026-09-25 | **Q-26:** keep `AnomalyDetector` in 4b; 4a tests the chat column, 4b the proactive column | Repo owner |
+| 2026-09-25 | **seed-scenarios.md approved**; data-architecture.md updated with the schema changes; go-ahead for the rest of Phase 3a | Repo owner |
+| 2026-09-25 | **Phase 3a gate review:** both schema deviations accepted (`add_on` wide contents; `tariff_rate.unit_price NUMERIC(14,4)`). A-73: supplier-registered states become a config list (`billshock.tax.supplier-state-codes`); note that large Indian telcos register in each state they serve, so most postpaid bills would be intra-state; the seed keeps `[27]` so the IGST accounts stay covered; FOR TAX REVIEW. README "Run locally" section added | Repo owner |
+| 2026-09-25 | **Phase 3a approved** | Repo owner |
 | 2026-09-25 | Phase 2 answer 7: A-58 to A-65 accepted. A-63 limitation documented (usage up to the previous day; no in-trip real-time alerts in v1; real-time usage events as a future enhancement) | Repo owner |
 
 ## Notes for the Phase 3a session
 
-- **Versions to pin (latest on Maven Central, 2026-09-25):** Spring Boot **3.5.16**, Spring AI
-  **1.1.8** (BOM), Spring Modulith **1.4.13**. Re-check prompt caching (Q-2) in the sources of
-  the version actually pinned before writing it into `pom.xml`.
+- **Pinned versions (ADR-008, decided 2026-09-25):** Spring Boot **4.1.1**, Spring AI
+  **2.0.1** (BOM), Spring Modulith **2.1.1** (BOM), Java 21. Managed by Boot 4.1.1: Jackson
+  3.1 (`tools.jackson`), Hibernate 7.4, Spring Security 7.1, Flyway 12.4 (needs
+  `spring-boot-starter-flyway`), Testcontainers 2.0, PostgreSQL JDBC 42.7.13. Q-2 is
+  verified in 2.0.1. **Never write imports from memory:** check against the pinned jars
+  (AGENTS.md). *(Superseded: the Phase 2 plan of 3.5.16 / 1.1.8 / 1.4.13.)*
+- **Migrations rule:** edit V1–V6 in place until the first real deployment (3a answer 3).
 - The schema follows `data-architecture.md` (partition keys, primary keys that include the
   partition key, indexes in §7.1). The throwaway DDL used for EXPLAIN is a starting point
   but is not the Flyway schema.
@@ -187,13 +216,133 @@ the questions raised in the Phase 1 documents.
 - Measure real row sizes (`pg_column_size`) on seed data and compare with A-54 and A-26.
 - 5a: choose the current Haiku-tier model via llm-architecture.md §15 (Q-15); implement
   cost metering with prices per MTok (Q-17). 5b: stream-recovery API (Q-16).
-- 5a reminders: build the Anthropic ChatModel beans explicitly (no default temperature 0.8;
-  max tokens set); keep customer data out of the system prompt; the `diffBills` pre-fetch
+- 5a reminders: build the Anthropic ChatModel beans explicitly (model, max tokens and
+  timeout set; **`maxRetries(0)`**, ADR-008; temperature unset for Sonnet 5); keep customer data out of the system prompt; the `diffBills` pre-fetch
   goes in as a message; live temperature check only with owner approval.
 - **7th seed scenario** (late roaming) stays scheduled for 6b; the data model supports it now
   (ADR-007).
 
+## Phase 3a progress (2026-09-25)
+
+**Step 0: version check (done, decided).** Findings are in ADR-008. Spring Boot 4.1.1,
+Spring AI 2.0.1 and Spring Modulith 2.1.1 are GA; Boot 3.5.x and Spring AI 1.1.x OSS
+support ended on 2026-06-30. Prompt caching exists in both stacks. Stack B was chosen.
+
+Files changed (uncommitted; the owner commits):
+- New: `docs/02-design/adr/008-framework-versions-boot4-spring-ai2.md`,
+  `docs/03-development/seed-scenarios.md`
+- Updated: `SPEC.md` §3; `AGENTS.md` (tech stack + the "never from memory" rule);
+  `llm-architecture.md` (header, §1, **§2 re-checked against 2.0.1** with new rows F-8
+  and F-9, §4, §9 built-in tool-call limit, §11 single retry layer, §14);
+  `architecture.md` (ADR index, container label); ADR-005 and ADR-006 (version notes);
+  `observability.md` §2; `feasibility.md` (T-6 resolved, T-8 closed); `assumptions.md`
+  (A-64 note, **new §8 with A-71 to A-82**); `plan-and-budget.md` §2a (Boot 4)
+
+**Re-check results against 2.0.1** (llm-architecture.md §2):
+- The Anthropic module now uses the official Anthropic Java SDK. Its default of 2
+  retries is overridden to 0.
+- `effort` and adaptive thinking are available, which resolves T-6.
+- No default temperature is sent, which closes T-8.
+- Cache tokens are available in the standard usage data.
+- There is a built-in tool-call limit (`ToolCallLimits`). §9 now uses it, with
+  `escalateToHuman` and `recordDiagnosis` excluded from the count of 8. This exclusion
+  is new; the owner should confirm it.
+- `ToolExecutionEligibilityPredicate` was renamed to `…Checker`.
+- JDBC memory still deletes and re-inserts the whole conversation, so A-64 stands.
+
+**Seed design (for review):**
+- `seed-scenarios.md` covers 6 accounts, 42 bills and 130 line items, with the
+  CGST/SGST/IGST model and HALF_EVEN tie cases.
+- Expected diff and simulation values are included.
+- It proposes schema changes: `gst_state_code`, `place_of_supply`, `supply_type`,
+  `tax_component`, `tax_rate` and service-period columns, and removes per-line
+  `tax_amount`.
+- It raises Q-20 to Q-23.
+
+**Seed review round 1 (applied 2026-09-25):**
+- Q-20 to Q-23 decided and recorded (seed-scenarios.md §5.7, §7, §11; A-72 extended; new
+  A-83; SPEC §4.6; PRD US-DIA-01; llm-architecture.md §9, §10).
+- **Correction found:** the built-in Spring AI limit cannot exclude tools from the total
+  count (F-5), so §9 now uses a `TurnToolBudget` decorator, with the built-in limits as a
+  backstop.
+- New expectations table: chat vs proactive, per scenario. The proactive outcome for 1003
+  and 1004 depends on Q-24.
+
+**Phase 3a build (done 2026-09-25; at the gate):**
+
+What exists now (all uncommitted; the owner commits):
+- **Build:** Maven Wrapper (Maven 3.9.16), `pom.xml` on Boot 4.1.1 with the Spring AI
+  2.0.1 BOM (no AI starters yet, A-82) and the Spring Modulith 2.1.1 BOM. Failsafe runs
+  the `*IT` classes in `verify`, so `./mvnw test` stays unit-only (no Docker needed).
+- **Modules:** 9 slice modules (`domain` open; `bss`, `analysis`, `tools`, `agent`,
+  `actions`, `api`, `security`, `audit`), with allowed dependencies declared in each
+  `package-info.java` to match architecture.md §4. `ModularityTests` verifies them and
+  writes the module docs to `target/spring-modulith-docs`. A deliberate illegal
+  dependency (`security` → `bss`) was tried, it failed the build, and it was removed.
+- **Domain:** `Money` (BigDecimal, 2 dp, HALF_EVEN, no silent rounding), `BillPeriod`,
+  `AccountId`, `SupplyType`, `GstCalculator` (A-72).
+- **Flyway V1–V6:** all slice tables per data-architecture.md, including the approved
+  GST columns. Monthly partitions from 2026-01 to 2027-12 (216) are created by a
+  PL/pgSQL function; timestamptz bounds are pinned to UTC; there is no DEFAULT partition.
+  CHECKs cover bill totals, TAX-line fields and period days. `audit_events` is
+  append-only through a trigger. PostgreSQL 16 has no identity columns on partitioned
+  tables, so `llm_call_log` and `audit_events` use sequences.
+- **Seed** (`db/seed`, dev/test only): `V1001` catalogue (8 plans, 80 tariff rows, 5
+  add-ons), `V1002` 6 accounts, 42 bills, 130 line items, `V1003` usage (42 period rows,
+  roaming, and 372 daily rows generated in SQL by the A-81 rule). It matches
+  seed-scenarios.md exactly.
+- **bss:** a published API made of 5 TMF gateway interfaces (TMF678, TMF635, TMF620,
+  TMF622, TMF621) and `BillingReadModel`, plus `TaxProperties`. Internals: read-only JPA
+  entities and repositories with composite keys that include the partition key. There
+  are in-process mock gateways (`mock-bss` profile, enabled by the `dev`/`test` profile
+  groups) serving JSON fixtures, and their write calls are idempotent per key.
+- **Config:** Flyway is enabled only in `dev`/`test` (A-82); JPA `ddl-auto: none`;
+  `docker-compose.yml` has PostgreSQL 16 + pgvector (`shm_size: 256mb`, healthcheck);
+  `.env.example` has new placeholder names.
+- **Tests:**
+  - 28 unit tests: modularity, Money, GST (all seed tie cases), BillPeriod, mock fixtures.
+  - 63 integration tests on Testcontainers `pgvector/pgvector:pg16`:
+    - schema: partitions, out-of-range insert, CHECKs, audit immutability
+    - seed: all 42 bill totals of §5 with GST recomputed, supply type per state, the
+      duplicate rental, usage charges = line items, daily = period, the UAE trip, the
+      batch ledger
+    - read model
+    - catalogue fixture vs replica
+- **Dev check:** `docker compose up` plus the jar with `SPRING_PROFILES_ACTIVE=dev`
+  applied 9 migrations and started in 3 s with 42 bills. The stack was removed
+  afterwards.
+- **Row sizes** (`pg_column_size`, row data only): `bill` 106 B, `bill_line_item` 133 B,
+  `usage_period` 97 B, `usage_daily` 99 B, `usage_period_roaming` 70 B,
+  `usage_daily_roaming` 81 B. These are below A-26 and A-54 (notes added there).
+
+Deviations from the docs, to confirm at the gate:
+- `add_on` uses wide content columns plus `validity`, instead of `usage_type`/`units`,
+  because roaming packs bundle data, voice and SMS.
+- `tariff_rate.unit_price` is `NUMERIC(14,4)`: a rate, not an amount.
+- data-architecture.md §4.2 has been updated to match both.
+
+Not in 3a (as planned):
+- In 3b: read-replica routing, retention and partition-maintenance job, WireMock, CI,
+  code-quality plugins.
+- Spring Security is not on the classpath yet (5a).
+- `usage_daily` has no JPA mapping yet (added when a consumer needs it).
+
+**Gate review changes (2026-09-25):**
+- `TaxProperties.supplierStateCodes` is now a set (config `billshock.tax.supplier-state-codes`,
+  seed `[27]`), and `SupplyType.of(state, registeredStates)` uses it. The seed IT checks
+  the supply type against the configured list and asserts 3 intra-state and 3 inter-state
+  accounts.
+- A-73 was rewritten with the multi-state registration note (FOR TAX REVIEW), and
+  seed-scenarios.md §2, §8, §10 and data-architecture.md §4.1 were updated to match.
+- `README.md` is new, with a "Run locally" section and troubleshooting. Its steps were
+  run as written with a temporary `.env` on port 55432: compose was healthy, the app
+  started with 9 migrations, and `docker compose exec … psql` showed the 6 September
+  totals. The host-`psql` command was not run, because there is no host psql on this
+  machine.
+
 ## Next step
 
-Phase 2 is complete and all review answers are applied (uncommitted; the owner commits).
-Wait for the go-ahead to start Phase 3a (Foundation, MVP slice; scope in plan-and-budget §2a).
+Phase 3a is approved. The owner commits (commands printed in the session). Next:
+**Phase 4a** (BillDiffEngine with the chat threshold, PlanSimulator, scenario
+guardrails, and unit tests with exact BigDecimal assertions against seed-scenarios.md),
+**after the owner's go-ahead**.

@@ -1,0 +1,10 @@
+# Local development against `docker compose up -d` (values from .env).
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:${POSTGRES_PORT:5432}/${POSTGRES_DB:billshock}
+    username: ${POSTGRES_USER:billshock}
+    password: ${POSTGRES_PASSWORD}
+  flyway:
+    enabled: true
+    # Schema plus demo seed data (db/seed never runs outside dev/test, A-82).
+    locations: classpath:db/migration,classpath:db/seed

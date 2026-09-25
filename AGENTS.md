@@ -15,11 +15,14 @@
   explicit ASSUMPTION in the docs.
 
 ## Tech stack (do not change without asking)
-- Java 21, Spring Boot 3.x, Spring AI 1.x (via BOM), Maven Wrapper (`./mvnw`)
+- Java 21, Spring Boot 4.x, Spring AI 2.x (via BOM), Spring Modulith 2.x, Maven Wrapper
+  (`./mvnw`). Pinned versions and the reasons: ADR-008.
 - PostgreSQL 16 + pgvector, Flyway, Redis, Kafka, Docker Compose
 - Before using any Spring AI class or annotation, verify it exists in the version
   declared in pom.xml (check the dependency sources or the official docs). Do not guess
   APIs from memory.
+- Boot 4 / Spring AI 2 / Jackson 3 are new — never write imports or APIs from memory;
+  verify package names against the pinned jars.
 
 ## Build and test commands
 - Build and all tests: `./mvnw verify`

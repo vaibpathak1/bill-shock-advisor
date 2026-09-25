@@ -1,0 +1,25 @@
+spring:
+  application:
+    name: bill-shock-advisor
+  profiles:
+    group:
+      # dev and test run against the in-process mock BSS gateways (A-80).
+      dev: mock-bss
+      test: mock-bss
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: none          # Flyway owns the schema
+  flyway:
+    # Outside dev/test, migrations run as a pre-deploy Kubernetes Job, not at startup
+    # (SPEC §6, A-82; Phase 11).
+    enabled: false
+
+billshock:
+  tax:
+    # GST state codes in which the operator holds a GST registration (A-73, FOR TAX REVIEW).
+    # A real operator is usually registered in every state it serves; the seed uses only 27
+    # (Maharashtra) so that the IGST path stays covered. Set per environment.
+    supplier-state-codes:
+      - "27"
+    gst-rate: 18.00             # A-72

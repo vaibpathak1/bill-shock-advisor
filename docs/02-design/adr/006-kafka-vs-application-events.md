@@ -31,9 +31,9 @@ partitions exist for consumer parallelism.
 
 ## Decision
 
-**Option C**, using Spring Modulith 1.4.x (the line compatible with Spring Boot 3.5;
-**version pinned in Phase 3a**, with the API checked against the pinned sources as
-AGENTS.md requires):
+**Option C**, using Spring Modulith 2.1.x (the line for Spring Boot 4.1; **2.1.1 pinned in
+Phase 3a**, ADR-008; Phase 2 wrote 1.4.x for Boot 3.5), with the API checked against the
+pinned sources as AGENTS.md requires:
 
 - **Publishing:** a module publishes a domain event with `ApplicationEventPublisher` inside
   its business transaction. The Modulith **Event Publication Registry** (JDBC; the
@@ -43,7 +43,7 @@ AGENTS.md requires):
   `@Externalized("<topic>::#{accountId()}")`, which gives the topic and the key (`account_id`,
   SPEC §2.3). With the `spring-modulith-events-kafka` module on the classpath and
   externalization enabled (staging/prod profiles), the registry publishes them to Kafka
-  and marks them completed after the send is acknowledged. Checked in the 1.4.13 sources:
+  and marks them completed after the send is acknowledged. Checked in the 1.4.13 sources and re-checked in 2.1.1 (Phase 3a):
   `org.springframework.modulith.events.Externalized`,
   `EventExternalizationConfiguration`, `KafkaEventExternalizerConfiguration`.
 - **Local profile:** externalization off; the same events reach

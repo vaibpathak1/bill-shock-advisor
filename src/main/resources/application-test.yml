@@ -1,0 +1,5 @@
+# Integration tests: the datasource comes from Testcontainers (@ServiceConnection).
+spring:
+  flyway:
+    enabled: true
+    locations: classpath:db/migration,classpath:db/seed

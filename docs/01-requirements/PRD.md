@@ -134,7 +134,13 @@ As a consumer, I want a short explanation with ₹ amounts, largest cause first.
 - The structured `BillShockDiagnosis` has `causes[]` (each with category, amount and
   supporting line-item ids), `totalExcess`, `confidence` and `recommendedActions[]`.
 - Σ `causes[].amount` reconciles with `totalExcess` within ₹0.01, as computed by the
-  engine (not the LLM).
+  engine (not the LLM). **Decision Q-23:** each cause carries its amount before GST, its
+  GST and its GST-inclusive amount; Σ of the GST-inclusive amounts equals the increase in
+  the bill total exactly.
+- Every amount in the answer says whether it includes GST. A cause is named by its
+  GST-inclusive amount (what the bill total shows), for example "₹2,094.50 incl. GST".
+  The strings are formatted in Java and copied verbatim by the model (llm-architecture.md
+  §10).
 - Jargon (proration, VAS, roaming pack) is explained in plain words on first use.
 
 **US-DIA-02: A normal bill is called normal (P1)**

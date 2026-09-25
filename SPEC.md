@@ -211,8 +211,9 @@ the chat flow, a sequence diagram for the proactive flow, and a deployment diagr
 ---
 
 ## 3. TECHNOLOGY STACK
-- Backend: Java 21, Spring Boot 3.x (latest stable), Spring Modulith, Maven.
-- AI: Spring AI (latest stable 1.x, via the BOM) using ChatClient, @Tool, ChatMemory
+- Backend: Java 21, Spring Boot 4.x (latest stable), Spring Modulith 2.x, Maven.
+  Pinned versions and the reasons for leaving Boot 3.x / Spring AI 1.x: ADR-008.
+- AI: Spring AI (latest stable 2.x, via the BOM) using ChatClient, @Tool, ChatMemory
   (JDBC), advisors, structured output, PGVector, and Transformers embeddings.
 - Frontend: a minimal static HTML/JS chat page served by Spring (v1). Document an Angular
   upgrade path for a care-agent console.
@@ -317,7 +318,11 @@ continues the answer. The agent does not re-call `diffBills` for the same period
 the user asks about a different period or baseline.
 
 The agent must: investigate before explaining (using the pre-fetched diffBills result); explain the cause
-in 2–4 plain sentences with ₹ amounts, largest driver first; quantify every
+in 2–4 plain sentences with ₹ amounts, largest driver first. Amounts are **copied verbatim
+from the pre-formatted, GST-labelled strings in the tool results** ("₹2,832.00 incl. GST";
+"₹599 + GST" for catalogue prices). A cause is named by its GST-inclusive figure. The
+grounding check verifies that each amount and its label came from a tool result: on a
+label mismatch it regenerates once, then falls back to the template; quantify every
 recommendation; offer at most 3 options; state clearly what needs confirmation versus
 what was done automatically; explain jargon; and return a structured BillShockDiagnosis
 (causes[], totalExcess, confidence, recommendedActions[]).

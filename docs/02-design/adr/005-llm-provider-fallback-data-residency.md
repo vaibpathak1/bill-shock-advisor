@@ -94,7 +94,7 @@ inference geographies (`us` costs 1.1x). There is no India option.
 
 | Option | Residency | Cost vs baseline | Engineering | Other |
 |---|---|---|---|---|
-| **A. Anthropic API, global routing, strict data minimisation** (recommended) | Processing location not guaranteed; no India option | Baseline (A-20) | Baseline: Spring AI `spring-ai-anthropic`; prompt caching verified in Spring AI 1.1.8 sources | Anthropic lifecycle (retirement dates on the Anthropic deprecations page) |
+| **A. Anthropic API, global routing, strict data minimisation** (recommended) | Processing location not guaranteed; no India option | Baseline (A-20) | Baseline: Spring AI `spring-ai-anthropic`; prompt caching verified in Spring AI 1.1.8 sources and re-verified in the pinned 2.0.1 (ADR-008) | Anthropic lifecycle (retirement dates on the Anthropic deprecations page) |
 | A′. Anthropic API, `inference_geo: us` | Pinned to the US (not India) | +10% on all tokens (~+$7k/month at 1x) | Same as A | Makes the location *known* and contractible, but outside India |
 | B. Bedrock from ap-south-1, `global.*` profile | Not guaranteed (global routing) | Bedrock pricing (separate) | Different Spring AI module (Bedrock Converse); prompt caching and adaptive-thinking support would need fresh verification (Q-2 again); PrivateLink from the VPC | AWS-native IAM, billing and quotas; Haiku 4.5 EOL "no sooner than 10/1/2026" on Bedrock |
 | C. Vertex AI (global or US/EU) | Not India | Vertex pricing | Cross-cloud from AWS (egress, a second IAM plane) | No benefit over A for India |
