@@ -40,6 +40,8 @@
 - Action tools create a ProposedAction only; execution happens via confirmation.
 - No secrets in the repo. Read keys from environment variables; keep `.env.example`
   updated with placeholder names only.
+- Never create, modify, move or delete `.env`. For experiments, use a differently named temp
+  file (e.g. `.env.test-tmp`) and remove only that file.
 - Never run `terraform apply`, never push to remote, and never run destructive git
   commands (reset --hard, force push). I will do git pushes myself.
 
