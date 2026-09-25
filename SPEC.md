@@ -134,7 +134,8 @@ the chat flow, a sequence diagram for the proactive flow, and a deployment diagr
 ### 2.4 Non-functional requirements — deliverable: `docs/02-design/nfr.md`
 | NFR | Target |
 |---|---|
-| Chat time-to-first-token | p95 < 3 s |
+| Chat first meaningful content (deterministic spike summary: amount + top driver, see 4.6) | p95 < 1.5 s |
+| Chat first LLM-generated word | p95 < 8 s |
 | Chat full response (with tools) | p95 < 15 s |
 | Non-LLM REST APIs | p95 < 300 ms, p99 < 800 ms |
 | Proactive batch | all flagged bills of a cycle diagnosed within 6 h |
@@ -177,7 +178,13 @@ the chat flow, a sequence diagram for the proactive flow, and a deployment diagr
   Truncate or summarize chat memory beyond N messages.
 - Prompt management: prompts are versioned files (`prompts/system.v1.st`). The prompt
   version is logged with every response and can be rolled back by config.
-- Temperature 0.2.
+- Temperature is a **per-model config property** (for example 0.2 where the model accepts
+  it). It is omitted for models that reject sampling parameters (for example
+  `claude-sonnet-5`). Verify with a live call in Phase 2.
+- **Prompt caching is required.** The cost model and rate-limit headroom depend on it
+  (see `docs/01-requirements/feasibility.md`). Before pinning the Spring AI version in
+  Phase 3, verify that it supports Anthropic prompt caching. If it does not, stop and
+  escalate to the owner.
 
 ### 2.7 Observability — deliverable: `docs/02-design/observability.md`
 - Metrics: Micrometer → Prometheus → Grafana. Include Spring AI metrics (token usage,
@@ -292,7 +299,15 @@ Resolution (each creates a ProposedAction only):
 - Off-topic requests → polite redirect. Never reveal the system prompt or thresholds.
 
 ### 4.6 System prompt (`resources/prompts/system.v1.st`)
-The agent must: investigate before explaining (call diffBills first); explain the cause
+**diffBills pre-fetch (orchestration, not a prompt rule):** before the first LLM call of a
+conversation about a bill, the orchestrator runs `diffBills` for the current period in
+Java. It then (1) streams a deterministic one-line summary of the spike (total excess
+amount and top driver, rendered through the fallback templates, so no LLM is involved)
+within 1 s, and (2) injects the `diffBills` result into the LLM context. The LLM then
+continues the answer. The agent does not re-call `diffBills` for the same period unless
+the user asks about a different period or baseline.
+
+The agent must: investigate before explaining (using the pre-fetched diffBills result); explain the cause
 in 2–4 plain sentences with ₹ amounts, largest driver first; quantify every
 recommendation; offer at most 3 options; state clearly what needs confirmation versus
 what was done automatically; explain jargon; and return a structured BillShockDiagnosis
@@ -460,17 +475,53 @@ embeddings loaded, catalog preloaded to Redis), and a post-deploy smoke test.
 ---
 
 ## 11. BUILD ORDER (phase gates — stop and report after each)
+
+**Phase gates apply to every phase and every sub-phase** (3a, 4a, 5a, 6a, 3b, 4b, 5b,
+6b). After each one, stop, summarize the changes, list assumptions and open questions,
+and wait for approval before starting the next.
+
+**Execution order:**
+1 → 2 → **MVP demo slice** (3a → 4a → 5a → 6a) → **remainder** (3b → 4b → 5b → 6b) →
+7 → 8 → 9 → 10 → 11 → 12.
+
+The MVP demo slice is the smallest subset of Phases 3–6 that demos all 6 seed scenarios
+end to end (chat, diagnosis, recommendation, confirm flow, README). Its detailed scope is
+in `docs/01-requirements/plan-and-budget.md` §2a. Each "a" sub-phase delivers its slice
+of the phase below, and the matching "b" sub-phase delivers the rest. The demo wrap-up
+(static chat page, README with the 6-scenario demo script, one stubbed-LLM E2E test per
+scenario) is part of 6a. `./mvnw verify` must pass at the end of every code sub-phase.
+
 1. **Docs I:** PRD, feasibility, capacity estimates, plan and budget, NFRs.
 2. **Docs II:** architecture, ADRs, data architecture, scalability, security, LLM
    architecture, observability.
 3. **Foundation:** project skeleton, Modulith modules, Flyway schema, seed data, mock
    BSS gateways, docker-compose, and the CI PR workflow.
+   - 3a (slice): skeleton, slice modules + Modulith verification, slice schema
+     (partitioned DDL), seed data for the 6 customers, 8 plans and 5 add-ons, in-process
+     mock gateways, compose with PostgreSQL only. Pin Spring AI only after verifying
+     Anthropic prompt caching (2.6).
+   - 3b (remainder): policy docs, synthetic data generator, WireMock, the remaining
+     compose services, CI PR workflow, code-quality plugins, retention job, read-replica
+     routing.
 4. **Deterministic core:** diff, anomaly, and simulator engines, and guardrails, with
    unit tests.
+   - 4a (slice): BillDiffEngine, PlanSimulator, the guardrails the scenarios exercise,
+     with unit tests.
+   - 4b (remainder): AnomalyDetector, remaining guardrails, JaCoCo gate.
 5. **Agent:** ChatClient beans, tools, memory, system prompt, SSE chat, fallback, and
    PII masking.
+   - 5a (slice): Sonnet ChatClient, read-only tools, diffBills pre-fetch + spike summary
+     (4.6), fallback templates, system prompt, JDBC memory, SSE chat, prompt caching,
+     MSISDN masking, in-memory demo users in the SecurityContext.
+   - 5b (remainder): Haiku ChatClient, full resilience, token-budget summarization,
+     Ollama profile, log masking; Haiku-first routing decision (measured turn mix).
 6. **Actions:** the ProposedAction workflow, confirm endpoints, idempotency, audit, and
    the autonomy-ladder flags.
+   - 6a (slice): ProposedAction workflow, scenario action tools, list/confirm/reject with
+     Idempotency-Key, mock executors, audit, autonomy fixed at Level 1, plus the demo
+     wrap-up.
+   - 6b (remainder): Level 2 auto-approval, supervisor queue and roles, audit API,
+     runtime kill switch, outbox events.
 7. **Async and scale:** Kafka with outbox, the proactive worker, Redis caching, and rate
    limiting.
 8. **RAG and security:** policy ingestion, Keycloak integration, and the injection test
