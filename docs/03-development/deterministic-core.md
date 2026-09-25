@@ -316,6 +316,13 @@ inclusive: exactly ₹2,000.00 is allowed). `MoneyOutCap` implements this, and b
 `GoodwillCreditCheck` and `VasCheck` use it. A dispute moves no money (it opens a TMF621
 ticket), so the cap does not apply to it.
 
+**Why a VAS refund has the cap but no ₹500 supervisor flag** (owner decision, 4a gate):
+a VAS refund is **evidence-based, not discretionary**. The server proposes it only when the
+double opt-in evidence from BSS is missing, and it computes the amount from the billed
+charges, so nobody chooses the amount. The goodwill bill-share, ₹500 and prior-credit rules
+exist to limit discretionary generosity, so they do not apply. The ₹2,000 cap still applies,
+because no money-out action may be uncapped.
+
 ### 4.6 VAS refund amount (A-86)
 
 The refund covers **all charges of that subscription in the local bill history** (7 billing
