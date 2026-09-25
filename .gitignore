@@ -1,0 +1,25 @@
+# Build
+target/
+build/
+*.class
+
+# IDE
+.idea/
+*.iml
+.vscode/*
+!.vscode/extensions.json
+
+# Secrets
+.env
+*.pem
+*.key
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+
+# OS
+.DS_Store
+Thumbs.db
