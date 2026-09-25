@@ -16,8 +16,9 @@
    than doubles. With it, 1x uses 41% of Scale-tier ITPM (capacity §4.3).
 2. **Every amount comes from deterministic engines** (ADR-003). This is what makes the
    product safe and makes the LLM-outage fallback possible.
-3. **Data residency is unresolved** (R-05). It may change the provider route and must be
-   settled in Phase 2 (ADR-005) before any production data is processed.
+3. **Data residency is unresolved** (R-05). Phase 2 found no India-region option on Bedrock or
+   Vertex AI; ADR-005's recommendation awaits the owner's decision and legal review, which
+   must happen before any production data is processed.
 4. **Regulatory questions need legal review** (R-08, R-09) before Level 0 launch.
 5. **A custom rate limit or enterprise agreement** is needed from about year 3, or from
    2.9x load for the spend cap. It is not needed at launch.
@@ -110,6 +111,9 @@ against the Spring AI version in `pom.xml` before use (AGENTS.md).
 | T-3 | Newer tokenizer (Claude 4.7 and later) gives ~30% more tokens for the same text | Pricing page, 2026-09-25 | Token estimates | A-37: estimates are already in model tokens |
 | T-4 | Prompt caching: cache reads don't count toward ITPM and cost 0.1x input | Pricing and rate-limit pages, 2026-09-25 | Makes 1x fit the Scale tier | **Spring AI must support Anthropic `cache_control`** in the version we pin. **Decided (Q-2):** verify before pinning the Spring AI version in Phase 3; if unsupported, stop and escalate to the owner (the cost model depends on it). SPEC 2.6 updated |
 | T-5 | Model id alias: the SPEC uses `claude-haiku-4-5-20251001`; the Claude API also lists the alias `claude-haiku-4-5` | Claude API reference | Config only | Keep the SPEC's id in config; model names come from config anyway (SPEC 2.6) |
+| T-6 | *(Phase 2)* Spring AI 1.1.8 `ThinkingType` has only `ENABLED`/`DISABLED`; there is **no `effort` option** | Spring AI 1.1.8 sources, 2026-09-25 | Cost control C-6 cannot be set through typed options | Phase 5: disable thinking on simple turns, or wait for framework support (llm-architecture.md F-3) |
+| T-7 | *(Phase 2)* Haiku 4.5's **minimum cacheable prefix is 4,096 tokens**; A-17's 2,000-token prefix would not be cached | Anthropic prompt-caching docs, 2026-09-25 | +$720/month at 1x if the prefix is not cached | **Decided (Q-18):** no artificial padding; extend only with quality-improving content, otherwise accept the cost; revisit with the successor model (llm-architecture.md §5) |
+| T-8 | *(Phase 2)* Spring AI 1.1.8 sends **temperature 0.8 by default**; Sonnet 5 returns 400 for a non-default temperature (Anthropic deprecations page, 2026-09-25) | Spring AI 1.1.8 sources; Anthropic docs | Would break every chat call | Build the ChatModel beans explicitly with temperature unset for Sonnet 5 (llm-architecture.md §1, §3); live check in 5a |
 
 ---
 
@@ -151,10 +155,10 @@ Config keys (proposed): `billshock.llm.pricing.<model>.input-per-mtok`, `…outp
 | Output per turn | 3 × 250 × $10 / 1M | $0.0075 | |
 | **LLM per turn** | | **$0.0345** | ₹3.04 |
 | **LLM per conversation** (6 turns) | | **$0.207** | **₹18.2** |
-| Infra share | 80% × $12,650 ÷ 320,000 conversations (plan-and-budget §3) | $0.032 | ₹2.8 |
-| **Total per conversation** | | **$0.239** | **₹21.0** |
+| Infra share | 80% × $10,850 ÷ 320,000 conversations (plan-and-budget §3; option C DB, Phase 2. Was $12,650 → $0.032 / ₹2.8) | $0.027 | ₹2.4 |
+| **Total per conversation** | | **$0.234** | **₹20.6** (Phase 1: ₹21.0) |
 | *Same, no prompt caching* | input multiplier 1.0 | *$0.509* | *₹44.8* |
-| **Proactive diagnosis** (Haiku 4.5, 1 call) | (4,000 × $1 + 2,000 × $0.10 + 600 × $5) / 1M | $0.0072 | ₹0.63 |
+| **Proactive diagnosis** (current Haiku-tier model (config), priced as Haiku 4.5; 1 call) | (4,000 × $1 + 2,000 × $0.10 + 600 × $5) / 1M | $0.0072 | ₹0.63 |
 | Proactive with Batch API (−50%) | option; see §3.5 | $0.0036 | ₹0.32 |
 
 The NFR "configurable max cost per conversation; alert above it" should start at around
@@ -165,7 +169,7 @@ The NFR "configurable max cost per conversation; alert above it" should start at
 Human contact cost is a placeholder at three values (A-35). Containment (share of
 conversations resolved without a human, A-38) is the other unknown.
 
-**Net saving per bill-shock conversation** = containment × human cost − AI cost (₹21.0).
+**Net saving per bill-shock conversation** = containment × human cost − AI cost (₹20.6 after the Phase 2 DB re-derivation; the rounded table below is the same as with Phase 1's ₹21.0).
 A conversation that escalates costs the AI cost **plus** the human contact.
 
 | Containment ↓ / Human cost → | Low ₹50 | Mid ₹100 | High ₹200 |
@@ -174,14 +178,14 @@ A conversation that escalates costs the AI cost **plus** the human contact.
 | **40% (A-38)** | **−₹1** | **+₹19** | **+₹59** |
 | 60% | +₹9 | +₹39 | +₹99 |
 
-**Break-even containment** = AI cost ÷ human cost: **42%** at ₹50, **21%** at ₹100,
-**10.5%** at ₹200. Without prompt caching (₹44.8 per conversation) it rises to 90% / 45% /
+**Break-even containment** = AI cost ÷ human cost: **41%** at ₹50, **21%** at ₹100,
+**10.3%** at ₹200 (Phase 1: 42% / 21% / 10.5%). Without prompt caching (₹44.8 per conversation) it rises to 90% / 45% /
 22%.
 
-**Monthly net effect at 1x** (320,000 conversations, 40% containment): **−₹3.2 lakh** at
-₹50, **+₹60.8 lakh** at ₹100, **+₹188.8 lakh** at ₹200 per contact.
+**Monthly net effect at 1x** (320,000 conversations, 40% containment): **−₹1.9 lakh** at
+₹50, **+₹62.1 lakh** at ₹100, **+₹190.1 lakh** at ₹200 per contact (Phase 2 figures).
 
-**Cost per resolved case (K-05)** at 40% containment = ₹21.0 ÷ 0.4 = **₹52.5**.
+**Cost per resolved case (K-05)** at 40% containment = ₹20.6 ÷ 0.4 = **₹51.5**.
 
 What the model leaves out (so treat it as indicative):
 - It **overstates** savings by assuming every AI conversation would otherwise have been a
@@ -240,7 +244,7 @@ Likelihood (L) and Impact (I): H / M / L. Owners are roles. Legal items are
 | R-02 | **Wrong or excessive credits** | M | H | ProposedAction + confirmation; guardrail chain in Java with thresholds from config; idempotency keys; ₹ auto-credited per hour alert (SPEC 2.7); autonomy ladder starting at Level 0; supervisor queue; runbook "wrong credits" | Product + billing ops | 4, 6, 9 |
 | R-03 | **Prompt injection**, direct ("ignore your instructions") or indirect (malicious text in a VAS name or policy document) | H | H | Identity from SecurityContext only; tools cannot reach other accounts; tool outputs treated as data; injection test suite (SPEC 5); no action executes without confirmation; OWASP LLM Top 10 mapping in security.md | Security | 5, 8 |
 | R-04 | **Sensitive information disclosure / PII sent to the LLM** | M | H | Only masked MSISDN (last 4 digits), no name or address, usage and charges only (SPEC 2.5); PII masking in logs; data-flow diagram marking PII boundaries (Phase 2) | Security / DPO | 2, 5 |
-| R-05 | **Data residency (OPEN).** Where the LLM processes customer data. The Anthropic first-party API lists only `global` (default) and `us` inference geographies (pricing page, 2026-09-25). Whether Claude is offered in an **India** region through a cloud provider (Bedrock or Vertex regional endpoints) is **not verified** | M | H | **Verify in Phase 2 for ADR-005**; do not assume. Minimise data sent (R-04). Options: in-country cloud route if available; legal assessment of cross-border transfer; the deterministic fallback as a no-LLM mode | Architect + legal | 2 |
+| R-05 | **Data residency (OPEN).** Where the LLM processes customer data. The Anthropic first-party API lists only `global` (default) and `us` inference geographies (pricing page, 2026-09-25). Whether Claude is offered in an **India** region through a cloud provider (Bedrock or Vertex regional endpoints) is **not verified** | M | H | **Phase 2 result (2026-09-25):** no India region for Claude Sonnet 5 or Haiku 4.5 on Bedrock (only the global profile from ap-south-1/2) or Vertex AI (US/EU/global). ADR-005 recommends the global endpoint + strict minimisation + template-only fall-back; **decision pending owner**, subject to legal review. Previously: verify in Phase 2 for ADR-005; do not assume. Minimise data sent (R-04). Options: in-country cloud route if available; legal assessment of cross-border transfer; the deterministic fallback as a no-LLM mode | Architect + legal | 2 |
 | R-06 | **LLM provider outage or degradation** | M | M | Resilience4j timeout, retry on 429/5xx, circuit breaker; deterministic template fallback (SPEC 2.6); fallback-rate alert > 5%; outage drill (SPEC 7) | SRE | 5, 9 |
 | R-07 | **Provider rate limits and spend cap** | L at 1x; H at 10x | M | Prompt caching (required); workspace quotas for chat vs batch; proactive semaphore; custom limits negotiated ahead (capacity §4.6); stubbed LLM for load tests | Architect | 5, 7, 10 |
 | R-08 | **DPDP Act 2023 obligations** (consent, purpose limitation, retention, data-principal rights, processor contracts with the LLM provider) — **FOR LEGAL REVIEW** | M | H | Retention periods proposed only as placeholders (A-29); purpose-limited data minimisation; compliance section in security.md written for legal review; no compliance claim | Legal / DPO | 2 |
@@ -256,12 +260,13 @@ Likelihood (L) and Impact (I): H / M / L. Owners are roles. Legal items are
 | R-18 | **Spec–API conflicts and framework gaps** (temperature on Sonnet 5; Spring AI support for prompt caching and adaptive thinking) | H | M | Verify against the pinned Spring AI version before implementing (AGENTS.md); open questions Q-1 and Q-2 | Tech lead | 2, 5 |
 | R-19 | **Provider lock-in** | M | L | Spring AI abstraction; Ollama profile for local; deterministic core works without any LLM | Architect | 2 |
 | R-20 | **Operational adoption** (care agents or supervisors do not trust or use it) | M | M | Assisted mode with the same diagnosis; UAT scripts with the care team; feedback loop into evals | Product | 10, 12 |
+| R-21 | *(Phase 2)* **Model retirement:** `claude-haiku-4-5-20251001` retirement is "not sooner than October 15, 2026" on the Claude API (Anthropic deprecations page, 2026-09-25); Vertex: October 15, 2026; Bedrock: October 1, 2026. At least 60 days' notice is given before retirement | M | M | **Decided (Q-15):** no fall-back model chosen now; model ids are config; the Haiku-tier model is chosen in 5a and switched only through the eval-gated process (llm-architecture.md §15); template fallback stays | Tech lead | 2, 5b, 7 |
 
 ### Ranking (highest combined exposure first)
 
 1. **R-02 / R-01**: financial harm from wrong credits or amounts. Largely controlled by
    the design (deterministic engines, HITL, Level 0 launch), but the impact is severe.
-2. **R-05**: data residency, which could change the provider route. Open until Phase 2.
+2. **R-05**: data residency, which could change the provider route. Phase 2 found no India region; the ADR-005 decision is with the owner.
 3. **R-08 / R-09**: regulatory exposure. Needs legal review before launch.
 4. **R-03**: prompt injection. High likelihood; mitigated by architecture.
 5. **R-12**: latency definition and TTFT.

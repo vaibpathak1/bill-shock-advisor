@@ -96,9 +96,16 @@ the chat flow, a sequence diagram for the proactive flow, and a deployment diagr
 - ER diagram and table list. Money columns are NUMERIC(14,2); never use float.
 - Data flow diagram: BSS → gateways → engines → LLM → actions → BSS, marking where
   PII crosses each boundary.
-- Partitioning: `usage_records`, `audit_events`, and `chat_messages` are
-  range-partitioned by month (native PostgreSQL partitioning), with a retention job that
-  drops or archives old partitions.
+- Usage layout (decision Q-6, option C; ADR-007): bill-period aggregates
+  (`usage_period`, `usage_period_roaming`) for 6 months + current; daily rows
+  (`usage_daily`, `usage_daily_roaming`) only for the current and previous cycle; per-session
+  detail from BSS on demand. Every usage row carries `billed_period` and `usage_period`, so
+  late usage (for example roaming via TAP files) is billed as a prior-period charge and
+  recomputed idempotently per ingest batch.
+- Partitioning: the usage tables above (by `billed_period`), `bill` and `bill_line_item`
+  (by `bill_period`), `audit_events`, and `chat_messages` are range-partitioned by month
+  (native PostgreSQL partitioning), with a retention job that drops or archives old
+  partitions.
 - Indexes: design them for every query path (account_id + bill_period, and so on).
   Include EXPLAIN plans for the top 5 queries in the doc.
 - Replication: a primary plus a read replica. Read-only tools and history queries use
@@ -165,7 +172,9 @@ the chat flow, a sequence diagram for the proactive flow, and a deployment diagr
 ### 2.6 LLM architecture — deliverable: `docs/02-design/llm-architecture.md`
 - Chat and tool calling: Anthropic Claude via Spring AI.
   - Live chat: `claude-sonnet-5` (reasoning quality matters here).
-  - Proactive batch diagnosis: `claude-haiku-4-5-20251001` (cheaper, high volume).
+  - Proactive batch diagnosis: the current Haiku-tier model (config) (cheaper, high volume). At the time of writing
+    this is `claude-haiku-4-5-20251001`; the model is chosen in Phase 5a and switched only
+    through the eval-gated process in `llm-architecture.md`.
   - Implement these as two ChatClient beans. Model names come from config.
 - Embeddings for RAG: Spring AI Transformers (ONNX, all-MiniLM-L6-v2, 384 dims) running
   in-process. Anthropic is used only for chat.

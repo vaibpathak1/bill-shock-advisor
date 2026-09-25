@@ -126,21 +126,24 @@ integration (agent → tools → confirm) is proven before the infrastructure-he
 |---|---|---|---|
 | EKS control plane (1 cluster) | 75 | 75 | 75 |
 | Worker nodes: app pods, Keycloak, observability (8 → 24 → 80 × 4 vCPU/16 GiB) | 1,200 | 3,600 | 12,000 |
-| RDS PostgreSQL primary, Multi-AZ (16 vCPU/128 GiB → 2x → 4 shards at 10x) | 4,500 | 9,000 | 36,000 |
-| RDS read replica(s) | 2,250 | 4,500 | 18,000 |
-| DB storage, provisioned IOPS, backups/PITR (5.4 TB → 16 TB → 54 TB, ×2 Multi-AZ) | 2,150 | 6,450 | 21,500 |
+| RDS PostgreSQL primary, Multi-AZ (16 vCPU/128 GiB → 2x → 4x at 10x; **no sharding with usage option C**, Phase 2) | 4,500 | 9,000 | 18,000 |
+| RDS read replica(s) (1 → 1 → 1 large or 2) | 2,250 | 4,500 | 9,000 |
+| DB storage, provisioned IOPS, backups/PITR (**option C, Phase 2:** 0.82 TB → 2.5 TB → 8.2 TB, ×2 Multi-AZ; was 5.4 → 16 → 54 TB under option A) | 350 | 1,000 | 3,300 |
 | ElastiCache Redis (primary + replica; 4 → 12 → 37 GB) | 500 | 1,000 | 4,000 |
 | MSK Kafka (3 brokers + storage) | 750 | 1,500 | 5,000 |
 | S3 (archives, eval reports) | 75 | 150 | 500 |
 | Load balancer, NAT gateways, data transfer | 600 | 1,500 | 5,000 |
 | Observability storage (metrics, logs, traces) | 400 | 1,000 | 3,000 |
 | Secrets Manager, KMS, WAF, misc. | 150 | 300 | 1,000 |
-| **Production infra total** | **12,650** | **27,075** | **106,075** |
-| **in INR** | **₹11.1 lakh** | **₹23.8 lakh** | **₹93.3 lakh** |
+| **Production infra total** | **10,850** | **23,625** | **60,875** |
+| **in INR** | **₹9.5 lakh** | **₹20.8 lakh** | **₹53.6 lakh** |
 
-The 10x column assumes the database has been sharded (SPEC 2.2 path; trigger in
-capacity §6). Non-production environments (dev, qa, staging) add a fixed 50% of 1x prod
-(A-33): **$6,325 = ₹5.6 lakh/month** at every load point.
+**Phase 2 update:** the DB lines were re-derived with usage layout option C
+(data-architecture.md §9). The 10x column no longer assumes sharding; one large primary
+plus replicas is enough (data-architecture.md §8). Under option A, the totals were $12,650 /
+$29,075 / $106,075. (**Correction:** Phase 1 printed the 3x total as $27,075, but its rows add up
+to $29,075, so the Phase 1 3x run cost was understated by ₹1.8 lakh/month.) Non-production environments (dev, qa, staging) add a fixed 50% of 1x
+prod (A-33): **$5,425 = ₹4.8 lakh/month** at every load point.
 
 ### 3.2 LLM (USD billed; INR shown)
 
@@ -149,7 +152,7 @@ Prices from A-20 (Anthropic list prices, 2026-09-25), with prompt caching per A-
 | Line | 1x | 3x | 10x |
 |---|---|---|---|
 | Live chat: `claude-sonnet-5` (1.92 M turns × $0.0345) | $66,240 | $198,720 | $662,400 |
-| Proactive: `claude-haiku-4-5-20251001` (400k × $0.0072) | $2,880 | $8,640 | $28,800 |
+| Proactive: current Haiku-tier model (config) (400k × $0.0072, Haiku 4.5 prices) | $2,880 | $8,640 | $28,800 |
 | Evals and experiments (A-47, fixed) | $500 | $500 | $500 |
 | **LLM total (USD)** | **$69,620** | **$207,860** | **$691,700** |
 | **LLM total (INR)** | **₹61.3 lakh** | **₹182.9 lakh** | **₹608.7 lakh** |
@@ -181,7 +184,7 @@ LLM monthly total                                            = $69,620  ✓ matc
 
 Investigation and recommendation turns stay on `claude-sonnet-5`, and the first turn of a
 conversation is always one of them. Simple and follow-up turns go to
-`claude-haiku-4-5-20251001`. The routing split is a new **ASSUMPTION (A-50)**, with the
+the current Haiku-tier model (config). The routing split is a new **ASSUMPTION (A-50)**, with the
 Haiku turn profile in A-51 and A-52.
 
 Per-turn cost:
@@ -213,22 +216,25 @@ Effects beyond cost:
 
 | | 1x | 3x | 10x |
 |---|---|---|---|
-| Production infra | ₹11.1 lakh | ₹23.8 lakh | ₹93.3 lakh |
-| Non-prod infra | ₹5.6 lakh | ₹5.6 lakh | ₹5.6 lakh |
+| Production infra | ₹9.5 lakh | ₹20.8 lakh | ₹53.6 lakh |
+| Non-prod infra | ₹4.8 lakh | ₹4.8 lakh | ₹4.8 lakh |
 | LLM (incl. evals) | ₹61.3 lakh ($69.6k) | ₹182.9 lakh ($207.9k) | ₹608.7 lakh ($691.7k) |
-| **Total per month** | **₹78.0 lakh** | **₹212.3 lakh** | **₹707.6 lakh** |
-| Total per month (USD equivalent) | $88.6k | $241.3k | $804.1k |
-| LLM share of total | 79% | 86% | 86% |
-| **Per year** | **₹9.4 crore** | **₹25.5 crore** | **₹84.9 crore** |
+| **Total per month** | **₹75.6 lakh** | **₹208.5 lakh** | **₹667.0 lakh** |
+| Total per month (USD equivalent) | $85.9k | $236.9k | $758.0k |
+| LLM share of total | 81% | 88% | 91% |
+| **Per year** | **₹9.1 crore** | **₹25.0 crore** | **₹80.0 crore** |
+
+Totals are computed in USD and converted at ₹88 (A-36), so the rounded INR rows can differ
+by ₹0.1 lakh. Phase 1 (option A) totals were ₹78.0 / ₹212.3 / ₹707.6 lakh (the 3x figure should have been ₹214.1 lakh; see the correction in §3.1).
 
 Observations:
-- **LLM is ~80% of run cost**, and live chat is ~95% of LLM cost. Cost controls must focus
+- **LLM is ~81% of run cost** (after the Phase 2 DB re-derivation), and live chat is ~95% of LLM cost. Cost controls must focus
   on chat tokens.
 - At 3x, LLM spend ($207.9k/month) **exceeds the Scale tier's $200,000 monthly spend cap**
   (A-21). A Custom tier or enterprise agreement is required before that point, and
   enterprise pricing is negotiable.
-- Unit cost is ~₹21 per chat conversation and ~₹0.63 per proactive diagnosis
-  (feasibility §3.2).
+- Unit cost is ~₹20.6 per chat conversation (₹21.0 in Phase 1, before the DB re-derivation)
+  and ~₹0.63 per proactive diagnosis (feasibility §3.2).
 
 ## 4. Cost controls
 
@@ -236,7 +242,7 @@ Observations:
 |---|---|---|---|
 | C-1 | **Prompt caching** (stable prefix: system prompt + tools; history cached; 5-min TTL) | Chat LLM $152.6k → $66.2k (**−57%**). Also required for rate limits | **Baseline requirement** (Phase 5); cache hit rate is a monitored metric |
 | C-2 | **Diagnosis cache per `bill_id`** (Redis L2, SPEC 2.3) | Avoids re-running engines and BSS calls when chat follows a proactive diagnosis (A-22). LLM effect small | Baseline (Phase 7) |
-| C-3 | **Model routing:** Haiku 4.5 for proactive (baseline). **Haiku-first routing** for simple/follow-up chat turns (§3.2a) | At the A-50 split of 40%: −24% chat LLM (−$16.2k/month). Caches are per model; must pass the eval gate | Scenario; decide in Phase 5 |
+| C-3 | **Model routing:** the current Haiku-tier model (config) for proactive (baseline). **Haiku-first routing** for simple/follow-up chat turns (§3.2a) | At the A-50 split of 40%: −24% chat LLM (−$16.2k/month). Caches are per model; must pass the eval gate | Scenario; decide in Phase 5 |
 | C-4 | **Fewer round trips:** deterministic `diffBills` pre-fetch before the first LLM call (**accepted**, decision Q-7) plus parallel tool calls | Pre-fetch alone: 3 → 2.83 average round trips, −5.6% (~$3.7k/month). With parallel tool calls reaching 2.5 average: −17% (~$11k/month) | Pre-fetch accepted (SPEC 4.6); saving measured in Phase 5 |
 | C-5 | **Token budgets per turn** (SPEC 2.6): max tool calls 8; max input tokens per turn; max output tokens; truncate or summarise memory beyond N messages | Caps the tail; protects against runaway loops | Baseline (Phase 5) |
 | C-6 | **`effort` tuning** on Sonnet 5 (low/medium) to limit adaptive-thinking tokens | Output tokens are ~22% of chat LLM cost; the saving depends on the eval result | Phase 5 experiment |

@@ -76,7 +76,7 @@ sensible stress target.
 |---|---|---|---|---|
 | Chat LLM call | `claude-sonnet-5` | 12,000 | 250 | A-15 |
 | Chat turn (3 round trips) | `claude-sonnet-5` | 36,000 | 750 | A-14 × A-15 |
-| Proactive diagnosis (1 call) | `claude-haiku-4-5-20251001` | 6,000 (2,000 cacheable) | 600 | A-17 |
+| Proactive diagnosis (1 call) | current Haiku-tier model (config) | 6,000 (2,000 cacheable) | 600 | A-17 |
 
 Only cache writes and uncached tokens count toward ITPM (A-21). For chat that is 25% of
 input tokens (A-16). For proactive it is the 4,000 non-cached tokens.
@@ -121,7 +121,7 @@ Planning rule: keep the peak minute at **≤ 70%** of any limit.
 | 10x | 135% | **405%** | 169% | **Custom limits required.** At the 70% rule: ≈ 58 M ITPM, 19k RPM, 4.8 M OTPM |
 | Stress | 72%–120% | **216%–360%** | 90%–150% | **Custom limits required** to run the stress test against the real provider. Use the stubbed LLM instead (SPEC 5) |
 
-### 4.4 Proactive requests and tokens per minute (`claude-haiku-4-5-20251001`)
+### 4.4 Proactive requests and tokens per minute (current Haiku-tier model (config))
 
 RPM = diagnoses per minute (1 call each). Counted ITPM = RPM × 4,000.
 
@@ -207,6 +207,9 @@ requirement. Without it, 1x does not fit.
 
 ### 5.3 Totals and growth over 3 years
 
+> Option A upper bound. Option C: 0.82 TB at launch, 1.42 TB at end of year 3, 8.2 TB at 10x
+> ([data-architecture.md §9](../02-design/data-architecture.md)).
+
 Primary database, steady state (excluding the Multi-AZ standby and the read replica, each
 a full copy):
 
@@ -233,7 +236,10 @@ Because every table has a fixed retention, database size grows with the subscrib
 
 > §5.1, §5.3 and §6 were derived with **option A** (narrow daily rows). The chosen layout
 > is **option C**, which is much smaller. Those sections are kept as the conservative
-> upper bound. The Phase 2 data architecture re-derives storage and IOPS with option C.
+> upper bound. **Phase 2 update:** storage and IOPS were re-derived with option C in
+> [data-architecture.md §9](../02-design/data-architecture.md): **≈ 0.82 TB and ≈ 1,070
+> peak IOPS at 1x; ≈ 8.2 TB and ≈ 10,700 IOPS at 10x, with no sharding needed.** The
+> summary in §10 uses these figures.
 
 **Step 1: what granularity does each consumer actually need?**
 
@@ -294,6 +300,9 @@ granularity for the daily table (weekly vs monthly, which sets the 0.15–0.23 T
 and the time-of-day tariff flag above.
 
 ## 6. Database IOPS
+
+> Option A upper bound. The option C figures (≈ 1,070 at 1x, ≈ 10,700 at 10x) are in
+> [data-architecture.md §9](../02-design/data-architecture.md).
 
 Using the I/O factors in A-30. The worst-case minute has the nightly usage load, a bill
 run and the chat peak all at once. That is pessimistic, since the usage feed runs at
@@ -380,8 +389,8 @@ semaphore is a share of that ceiling.
 | Sonnet 5 counted ITPM | 4.05 M | 7.0 M | 40.5 M | Caching is required; custom limits by year 3 |
 | Haiku counted ITPM | 0.89 M | 1.54 M | 8.9 M | Fine until 10x |
 | LLM tokens / busiest day | 4.8 B in / 138 M out | 8.3 B / 238 M | 48 B / 1.4 B | |
-| DB primary size | 5.4 TB | 9.3 TB | 54 TB | Usage aggregates are 90% of it |
-| DB peak IOPS | 2,300 | 4,000 | 23,000 | Sharding trigger zone at 10x |
+| DB primary size (option C, Phase 2) | 0.82 TB | 1.42 TB | 8.2 TB | Bills and audit now dominate. Option A upper bound was 5.4 / 9.3 / 54 TB |
+| DB peak IOPS (option C, Phase 2) | 1,070 | 1,850 | 10,700 | One large instance at 10x; no sharding (data-architecture.md §8). Option A upper bound was 2,300 / 4,000 / 23,000 |
 | Kafka peak | ~300 msg/s | ~520 msg/s | ~3,000 msg/s | Tiny; partitions sized for parallelism |
 | Redis | 4 GB | 7 GB | 37 GB | |
 | Pods (chat / worker) | 3 / 2 | 3 / 3 | 7 / 15 | |

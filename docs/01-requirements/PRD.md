@@ -228,7 +228,7 @@ conversation.
 **US-PRE-01: Proactive heads-up (P1)**
 As a consumer, I want to be told about an unusual bill before I discover it myself.
 - On `bill.generated`, the anomaly detector (deterministic) screens every bill. Flagged
-  bills get a diagnosis (`claude-haiku-4-5-20251001` for the explanation) and a
+  bills get a diagnosis (the current Haiku-tier model (config) writes the explanation) and a
   notification.
 - All flagged bills of a cycle are diagnosed within 6 h (NFR).
 - The notification links to the diagnosis. Opening chat from it reuses the cached
