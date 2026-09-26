@@ -1,0 +1,236 @@
+{
+  "schema_version": 1,
+  "diagram_type": "dataflow",
+  "meta": {
+    "title": "Where customer data goes",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "free-text",
+        "label": "Customer free text",
+        "focus": [
+          "msg",
+          "scrub",
+          "chatdb",
+          "prompt"
+        ],
+        "note": "The scrubbed text is the only version that is stored or sent."
+      },
+      {
+        "id": "account-data",
+        "label": "Account data",
+        "focus": [
+          "data",
+          "tools",
+          "prompt",
+          "serveronly"
+        ],
+        "note": "Tools mask and aggregate; full identifiers stay server-side."
+      },
+      {
+        "id": "egress",
+        "label": "Leaves and returns",
+        "focus": [
+          "prompt",
+          "claude",
+          "gate"
+        ],
+        "note": "Only the assembled prompt crosses the trust boundary; the answer is gated on the way back."
+      }
+    ],
+    "viewBox": [
+      1080,
+      560
+    ]
+  },
+  "stages": [
+    {
+      "label": "Source"
+    },
+    {
+      "label": "Minimise"
+    },
+    {
+      "label": "Assemble"
+    },
+    {
+      "label": "Leaves boundary"
+    },
+    {
+      "label": "Returns"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "msg",
+      "type": "frontend",
+      "label": "Customer message",
+      "sublabel": "free text",
+      "stage": 0,
+      "row": 0
+    },
+    {
+      "id": "data",
+      "type": "database",
+      "label": "Account data",
+      "sublabel": "bills · usage · subs",
+      "tag": "full MSISDN",
+      "stage": 0,
+      "row": 1
+    },
+    {
+      "id": "scrub",
+      "type": "security",
+      "label": "PiiScrubber",
+      "sublabel": "phone · ID · card",
+      "stage": 1,
+      "row": 0
+    },
+    {
+      "id": "tools",
+      "type": "security",
+      "label": "Tool results",
+      "sublabel": "MsisdnMask · Amount",
+      "tag": "******1001",
+      "stage": 1,
+      "row": 1
+    },
+    {
+      "id": "chatdb",
+      "type": "database",
+      "label": "chat_messages",
+      "sublabel": "scrubbed only",
+      "stage": 2,
+      "row": 0
+    },
+    {
+      "id": "prompt",
+      "type": "backend",
+      "label": "Prompt builder",
+      "sublabel": "system + window",
+      "stage": 2,
+      "row": 1
+    },
+    {
+      "id": "serveronly",
+      "type": "database",
+      "label": "Server-side only",
+      "sublabel": "account id · audit",
+      "tag": "never sent",
+      "stage": 0,
+      "row": 2
+    },
+    {
+      "id": "claude",
+      "type": "external",
+      "label": "Anthropic Claude",
+      "sublabel": "outside boundary",
+      "stage": 3,
+      "row": 1
+    },
+    {
+      "id": "gate",
+      "type": "security",
+      "label": "GroundingGate",
+      "sublabel": "per sentence",
+      "stage": 4,
+      "row": 1
+    }
+  ],
+  "flows": [
+    {
+      "id": "raw-text",
+      "from": "msg",
+      "to": "scrub",
+      "label": "raw text",
+      "classification": "may hold PII",
+      "variant": "emphasis"
+    },
+    {
+      "id": "store-scrubbed",
+      "from": "scrub",
+      "to": "chatdb",
+      "label": "[PHONE] [EMAIL] …",
+      "classification": "scrubbed"
+    },
+    {
+      "id": "window",
+      "from": "chatdb",
+      "to": "prompt",
+      "label": "last 12 messages",
+      "classification": "scrubbed",
+      "labelDy": 24
+    },
+    {
+      "id": "rows",
+      "from": "data",
+      "to": "tools",
+      "label": "rows",
+      "classification": "BigDecimal",
+      "variant": "emphasis"
+    },
+    {
+      "id": "masked",
+      "from": "tools",
+      "to": "prompt",
+      "label": "masked, aggregated",
+      "classification": "no account id",
+      "variant": "emphasis"
+    },
+    {
+      "id": "keep",
+      "from": "data",
+      "to": "serveronly",
+      "label": "full ids",
+      "classification": "stays here",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelDy": 24
+    },
+    {
+      "id": "egress",
+      "from": "prompt",
+      "to": "claude",
+      "label": "TLS, masked only",
+      "classification": "egress",
+      "variant": "security"
+    },
+    {
+      "id": "answer",
+      "from": "claude",
+      "to": "gate",
+      "label": "draft text",
+      "classification": "untrusted"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "rose",
+      "title": "Reaches the LLM",
+      "items": [
+        "Scrubbed customer text and memory window",
+        "Charges, periods, countries, masked MSISDN (last 4)",
+        "Engine results as display strings, e.g. ₹2,094.50 incl. GST"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Never reaches the LLM",
+      "items": [
+        "Full MSISDN and account id",
+        "Name, address, e-mail (not stored in v1)",
+        "Guardrail thresholds, reason codes, audit payloads"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "On the way back",
+      "items": [
+        "Each sentence is checked before it is sent",
+        "Unknown ₹ amounts → template answer",
+        "Untrusted BSS text is shown with textContent only"
+      ]
+    }
+  ]
+}

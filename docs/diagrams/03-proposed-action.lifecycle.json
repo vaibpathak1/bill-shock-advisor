@@ -1,0 +1,291 @@
+{
+  "schema_version": 1,
+  "diagram_type": "lifecycle",
+  "meta": {
+    "title": "ProposedAction lifecycle",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "happy",
+        "label": "Confirm and execute",
+        "focus": [
+          "proposed",
+          "pending",
+          "approved",
+          "executing",
+          "executed"
+        ],
+        "note": "A tool only proposes; the customer's confirm moves it to execution."
+      },
+      {
+        "id": "human",
+        "label": "Humans in the loop",
+        "focus": [
+          "pending",
+          "supervisor",
+          "escalated",
+          "approved"
+        ],
+        "note": "Supervisor review and hand-off to a human colleague."
+      },
+      {
+        "id": "unknown",
+        "label": "Unknown outcome",
+        "focus": [
+          "executing",
+          "unknown",
+          "failed"
+        ],
+        "note": "Only a definite BSS rejection fails; anything else stays EXECUTING and is re-driven."
+      }
+    ],
+    "viewBox": [
+      1080,
+      630
+    ]
+  },
+  "lanes": [
+    {
+      "id": "main",
+      "label": "Main path"
+    },
+    {
+      "id": "band",
+      "label": "Waiting and exceptions"
+    },
+    {
+      "id": "terminal",
+      "label": "Exits and hand-off"
+    }
+  ],
+  "states": [
+    {
+      "id": "proposed",
+      "type": "start",
+      "label": "Action tool call",
+      "sublabel": "guardrail chain runs",
+      "lane": "main",
+      "col": 0,
+      "step": "01"
+    },
+    {
+      "id": "pending",
+      "type": "waiting",
+      "label": "PENDING_CONFIRMATION",
+      "sublabel": "TTL 24 h",
+      "lane": "main",
+      "col": 1,
+      "step": "02",
+      "width": 134
+    },
+    {
+      "id": "approved",
+      "type": "active",
+      "label": "APPROVED",
+      "sublabel": "same txn as EXECUTING (6a)",
+      "lane": "main",
+      "col": 2,
+      "step": "03"
+    },
+    {
+      "id": "executing",
+      "type": "active",
+      "label": "EXECUTING",
+      "sublabel": "BSS calls, key pa-{id}",
+      "lane": "main",
+      "col": 3,
+      "step": "04"
+    },
+    {
+      "id": "executed",
+      "type": "success",
+      "label": "EXECUTED",
+      "sublabel": "every step DONE",
+      "lane": "main",
+      "col": 4,
+      "step": "05"
+    },
+    {
+      "id": "supervisor",
+      "type": "waiting",
+      "label": "AWAITING_SUPERVISOR",
+      "sublabel": "confirmed, flag set",
+      "lane": "band",
+      "col": 0,
+      "width": 134
+    },
+    {
+      "id": "escalated",
+      "type": "waiting",
+      "label": "ESCALATED",
+      "sublabel": "TMF621 ticket, stays open",
+      "lane": "terminal",
+      "col": 2
+    },
+    {
+      "id": "unknown",
+      "type": "failure",
+      "label": "Outcome unknown",
+      "sublabel": "row stays EXECUTING",
+      "tag": "202",
+      "lane": "band",
+      "col": 1,
+      "width": 118
+    },
+    {
+      "id": "rejected",
+      "type": "failure",
+      "label": "REJECTED",
+      "sublabel": "customer or re-check",
+      "lane": "terminal",
+      "col": 0
+    },
+    {
+      "id": "failed",
+      "type": "failure",
+      "label": "FAILED",
+      "sublabel": "definite BSS rejection",
+      "lane": "band",
+      "col": 2
+    },
+    {
+      "id": "expired",
+      "type": "neutral",
+      "label": "EXPIRED",
+      "sublabel": "TTL 24 h passed",
+      "lane": "terminal",
+      "col": 1
+    }
+  ],
+  "transitions": [
+    {
+      "id": "to-supervisor",
+      "from": "pending",
+      "to": "supervisor",
+      "fromSide": "bottom",
+      "toSide": "left"
+    },
+    {
+      "id": "supervisor-approves",
+      "from": "supervisor",
+      "to": "approved",
+      "label": "approve (6b)",
+      "variant": "dashed",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "labelAt": [
+        402,
+        250
+      ]
+    },
+    {
+      "id": "to-rejected",
+      "from": "pending",
+      "to": "rejected",
+      "variant": "security",
+      "fromSide": "bottom",
+      "toSide": "left"
+    },
+    {
+      "id": "to-expired",
+      "from": "pending",
+      "to": "expired",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "channelY": 405
+    },
+    {
+      "id": "to-escalated",
+      "from": "proposed",
+      "to": "escalated",
+      "label": "ESCALATE / escalateToHuman",
+      "variant": "security",
+      "fromSide": "bottom",
+      "toSide": "bottom",
+      "via": [
+        [
+          94,
+          538
+        ],
+        [
+          710,
+          538
+        ]
+      ],
+      "labelAt": [
+        400,
+        538
+      ]
+    },
+    {
+      "id": "to-failed",
+      "from": "executing",
+      "to": "failed",
+      "label": "definite reject",
+      "variant": "security",
+      "fromSide": "top",
+      "toSide": "right",
+      "via": [
+        [
+          556,
+          100
+        ],
+        [
+          800,
+          100
+        ],
+        [
+          800,
+          307
+        ]
+      ]
+    },
+    {
+      "id": "to-unknown",
+      "from": "executing",
+      "to": "unknown",
+      "label": "timeout · 5xx",
+      "variant": "security",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelDx": 52,
+      "labelDy": 30
+    },
+    {
+      "id": "redrive",
+      "from": "unknown",
+      "to": "executing",
+      "label": "re-drive, same key",
+      "variant": "emphasis",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "labelDx": -66
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "Main path",
+      "items": [
+        "Tools create PENDING_CONFIRMATION only",
+        "Confirm re-runs guardrails; APPROVED → EXECUTING in one update (6a)"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Unknown outcome",
+      "items": [
+        "Timeout or 5xx: effect may exist, so never FAILED",
+        "Re-drive resends key pa-{id}; auto reconcile job is 6b"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Exits and humans",
+      "items": [
+        "REJECTED, FAILED, EXPIRED free the target for a new proposal",
+        "Supervisor decision and AUTO_APPROVED (Level 2) are 6b"
+      ]
+    }
+  ]
+}

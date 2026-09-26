@@ -1,0 +1,290 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "One chat turn: pre-fetch, tool loop, gate, fallback",
+    "quality_profile": "showcase",
+    "column_fit": "spread",
+    "viewBox": [
+      1080,
+      620
+    ],
+    "views": [
+      {
+        "id": "fast-summary",
+        "label": "Summary in 1.5 s",
+        "focus": [
+          "page",
+          "api",
+          "orch",
+          "engine"
+        ],
+        "note": "The first answer line comes from Java before any LLM call."
+      },
+      {
+        "id": "tool-loop",
+        "label": "LLM tool loop",
+        "focus": [
+          "orch",
+          "tools",
+          "claude"
+        ],
+        "note": "The orchestrator runs the loop itself, on the caller's thread."
+      },
+      {
+        "id": "gate",
+        "label": "Gate and fallback",
+        "focus": [
+          "orch",
+          "gate",
+          "page"
+        ],
+        "note": "Every sentence is checked before it is sent; failures fall back to a template."
+      }
+    ]
+  },
+  "participants": [
+    {
+      "id": "page",
+      "type": "frontend",
+      "label": "Chat page",
+      "sublabel": "app.js"
+    },
+    {
+      "id": "api",
+      "type": "security",
+      "label": "ChatController",
+      "sublabel": "Basic auth · SSE"
+    },
+    {
+      "id": "orch",
+      "type": "backend",
+      "label": "Orchestrator",
+      "sublabel": "agent module"
+    },
+    {
+      "id": "engine",
+      "type": "backend",
+      "label": "BillDiffEngine",
+      "sublabel": "BigDecimal"
+    },
+    {
+      "id": "tools",
+      "type": "backend",
+      "label": "@Tool classes",
+      "sublabel": "TurnToolBudget"
+    },
+    {
+      "id": "gate",
+      "type": "security",
+      "label": "GroundingGate",
+      "sublabel": "per sentence"
+    },
+    {
+      "id": "claude",
+      "type": "external",
+      "label": "Claude",
+      "sublabel": "sonnet-5"
+    }
+  ],
+  "segments": [
+    {
+      "from": 150,
+      "to": 174,
+      "label": "Login"
+    },
+    {
+      "from": 180,
+      "to": 284,
+      "label": "Pre-fetch"
+    },
+    {
+      "from": 290,
+      "to": 422,
+      "label": "Tool loop ≤ 9 rounds"
+    },
+    {
+      "from": 430,
+      "to": 478,
+      "label": "Gate"
+    },
+    {
+      "from": 486,
+      "to": 534,
+      "label": "Fallback · done"
+    }
+  ],
+  "messages": [
+    {
+      "id": "login",
+      "from": "page",
+      "to": "api",
+      "y": 162,
+      "label": "login: Basic auth",
+      "variant": "security"
+    },
+    {
+      "id": "ask",
+      "from": "page",
+      "to": "api",
+      "y": 190,
+      "label": "POST /api/v1/chat",
+      "variant": "emphasis"
+    },
+    {
+      "id": "turn",
+      "from": "api",
+      "to": "orch",
+      "y": 218,
+      "label": "PiiScrubber · account",
+      "variant": "default"
+    },
+    {
+      "id": "diff",
+      "from": "orch",
+      "to": "engine",
+      "y": 246,
+      "label": "diff(latest bill) → BillDiff",
+      "variant": "emphasis"
+    },
+    {
+      "id": "summary",
+      "from": "orch",
+      "to": "page",
+      "y": 274,
+      "label": "SSE summary (template) < 1.5 s",
+      "variant": "emphasis"
+    },
+    {
+      "id": "prompt",
+      "from": "orch",
+      "to": "claude",
+      "y": 302,
+      "label": "prompt + diffBills context",
+      "variant": "security"
+    },
+    {
+      "id": "tool-use",
+      "from": "claude",
+      "to": "orch",
+      "y": 330,
+      "label": "tool_use",
+      "variant": "return"
+    },
+    {
+      "id": "exec",
+      "from": "orch",
+      "to": "tools",
+      "y": 358,
+      "label": "execute on turn thread",
+      "variant": "default"
+    },
+    {
+      "id": "results",
+      "from": "tools",
+      "to": "orch",
+      "y": 386,
+      "label": "results (Amount strings)",
+      "variant": "return"
+    },
+    {
+      "id": "text",
+      "from": "claude",
+      "to": "orch",
+      "y": 414,
+      "label": "streamed text",
+      "variant": "return"
+    },
+    {
+      "id": "check",
+      "from": "orch",
+      "to": "gate",
+      "y": 442,
+      "label": "each sentence",
+      "variant": "default"
+    },
+    {
+      "id": "token",
+      "from": "orch",
+      "to": "page",
+      "y": 470,
+      "label": "SSE token (released sentence)",
+      "variant": "emphasis"
+    },
+    {
+      "id": "fallback",
+      "from": "orch",
+      "to": "page",
+      "y": 498,
+      "label": "SSE fallback: template answer",
+      "variant": "dashed",
+      "note": "on value violation, 2nd mismatch, LLM error or timeout, budget or cost cap"
+    },
+    {
+      "id": "done",
+      "from": "orch",
+      "to": "page",
+      "y": 526,
+      "label": "SSE done (turn saved)",
+      "variant": "return"
+    }
+  ],
+  "activations": [
+    {
+      "participant": "api",
+      "from": 157,
+      "to": 223
+    },
+    {
+      "participant": "orch",
+      "from": 213,
+      "to": 531
+    },
+    {
+      "participant": "engine",
+      "from": 241,
+      "to": 251
+    },
+    {
+      "participant": "claude",
+      "from": 297,
+      "to": 423
+    },
+    {
+      "participant": "tools",
+      "from": 353,
+      "to": 391
+    },
+    {
+      "participant": "gate",
+      "from": 437,
+      "to": 447
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Pre-fetch first",
+      "items": [
+        "BillDiffEngine runs before any LLM call",
+        "Template summary line within 1.5 s (NFR-01a)"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Sentence gate",
+      "items": [
+        "Every ₹ amount must match a tool result exactly",
+        "Mismatch → regenerate once; unknown value → fallback"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Template fallback",
+      "items": [
+        "LLM error, timeout, budget or cost cap",
+        "Also the whole answer in TEMPLATE_ONLY mode"
+      ]
+    }
+  ]
+}

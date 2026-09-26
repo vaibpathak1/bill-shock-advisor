@@ -1,0 +1,386 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Bill Shock Advisor: runtime architecture",
+    "quality_profile": "showcase",
+    "viewBox": [
+      1190,
+      580
+    ],
+    "views": [
+      {
+        "id": "question-path",
+        "label": "Question to answer",
+        "focus": [
+          "page",
+          "api",
+          "orch",
+          "tools",
+          "engines",
+          "pg"
+        ],
+        "note": "The primary path: a customer question becomes an engine-computed, gated answer."
+      },
+      {
+        "id": "llm-edge",
+        "label": "LLM trust boundary",
+        "focus": [
+          "orch",
+          "claude",
+          "gates"
+        ],
+        "note": "Only masked, charge-level context leaves; every sentence is gated before it is sent."
+      },
+      {
+        "id": "actions-path",
+        "label": "Actions",
+        "focus": [
+          "page",
+          "api",
+          "tools",
+          "actions",
+          "bss",
+          "pg"
+        ],
+        "note": "Tools only propose; the customer's confirm executes against BSS."
+      }
+    ],
+    "repository": {
+      "url": "https://github.com/vaibpathak1/bill-shock-advisor",
+      "revision": "9c531eb15ec7ad16e2bca7835d219b52ff652ff1",
+      "link_mode": "local-only"
+    }
+  },
+  "components": [
+    {
+      "id": "page",
+      "type": "frontend",
+      "label": "Chat page",
+      "sublabel": "static HTML/JS · fetch + SSE",
+      "pos": [
+        30,
+        200
+      ],
+      "size": [
+        150,
+        64
+      ],
+      "sources": [
+        {
+          "path": "src/main/resources/static/app.js"
+        }
+      ]
+    },
+    {
+      "id": "api",
+      "type": "security",
+      "label": "REST API",
+      "sublabel": "Chat · Action controllers",
+      "tag": "auth · PiiScrubber",
+      "pos": [
+        270,
+        200
+      ],
+      "size": [
+        150,
+        64
+      ],
+      "sources": [
+        {
+          "path": "src/main/java/com/telco/billshock/api/ChatController.java"
+        }
+      ]
+    },
+    {
+      "id": "orch",
+      "type": "backend",
+      "label": "ChatOrchestrator",
+      "sublabel": "own tool loop, ≤ 9 rounds",
+      "pos": [
+        510,
+        200
+      ],
+      "size": [
+        150,
+        64
+      ],
+      "sources": [
+        {
+          "path": "src/main/java/com/telco/billshock/agent/internal/DefaultChatOrchestrator.java"
+        }
+      ]
+    },
+    {
+      "id": "claude",
+      "type": "external",
+      "label": "Anthropic Claude",
+      "sublabel": "claude-sonnet-5",
+      "pos": [
+        510,
+        40
+      ],
+      "size": [
+        150,
+        64
+      ]
+    },
+    {
+      "id": "gates",
+      "type": "security",
+      "label": "Grounding gates",
+      "sublabel": "sentence · diagnosis · claim",
+      "tag": "template fallback",
+      "pos": [
+        510,
+        340
+      ],
+      "size": [
+        150,
+        64
+      ],
+      "sources": [
+        {
+          "path": "src/main/java/com/telco/billshock/agent/internal/GroundingGate.java"
+        }
+      ]
+    },
+    {
+      "id": "tools",
+      "type": "backend",
+      "label": "@Tool classes",
+      "sublabel": "8 read · 7 action tools",
+      "pos": [
+        750,
+        200
+      ],
+      "size": [
+        150,
+        64
+      ],
+      "sources": [
+        {
+          "path": "src/main/java/com/telco/billshock/tools/BillingTools.java"
+        }
+      ]
+    },
+    {
+      "id": "engines",
+      "type": "backend",
+      "label": "Deterministic engines",
+      "sublabel": "BillDiffEngine · PlanSimulator",
+      "tag": "BigDecimal",
+      "pos": [
+        990,
+        200
+      ],
+      "size": [
+        170,
+        64
+      ],
+      "sources": [
+        {
+          "path": "src/main/java/com/telco/billshock/analysis/BillDiffEngine.java"
+        },
+        {
+          "path": "src/main/java/com/telco/billshock/analysis/PlanSimulator.java"
+        }
+      ]
+    },
+    {
+      "id": "actions",
+      "type": "backend",
+      "label": "ProposedActionService",
+      "sublabel": "GuardrailChain · executors",
+      "pos": [
+        750,
+        340
+      ],
+      "size": [
+        150,
+        64
+      ],
+      "sources": [
+        {
+          "path": "src/main/java/com/telco/billshock/actions/internal/ActionWorkflow.java"
+        }
+      ]
+    },
+    {
+      "id": "bss",
+      "type": "external",
+      "label": "Mock BSS",
+      "sublabel": "TMF APIs · in-process",
+      "tag": "profile mock-bss",
+      "pos": [
+        990,
+        480
+      ],
+      "size": [
+        170,
+        64
+      ],
+      "sources": [
+        {
+          "path": "src/main/java/com/telco/billshock/bss/internal/mock/MockCustomerBillGateway.java"
+        }
+      ]
+    },
+    {
+      "id": "pg",
+      "type": "database",
+      "label": "PostgreSQL 16",
+      "sublabel": "bills · chat · actions · audit",
+      "pos": [
+        990,
+        340
+      ],
+      "size": [
+        170,
+        64
+      ]
+    },
+    {
+      "id": "redis",
+      "type": "database",
+      "label": "Redis (planned)",
+      "sublabel": "cache · rate limits",
+      "tag": "not built",
+      "pos": [
+        270,
+        480
+      ],
+      "size": [
+        150,
+        64
+      ]
+    },
+    {
+      "id": "kafka",
+      "type": "messagebus",
+      "label": "Kafka (planned)",
+      "sublabel": "events · proactive-worker",
+      "tag": "not built",
+      "pos": [
+        510,
+        480
+      ],
+      "size": [
+        150,
+        64
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "security-group",
+      "label": "Trust boundary: operator side (data stays here)",
+      "wraps": [
+        "api",
+        "orch",
+        "gates",
+        "tools",
+        "engines",
+        "actions",
+        "bss",
+        "pg",
+        "redis",
+        "kafka"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "ask",
+      "from": "page",
+      "to": "api",
+      "label": "POST /chat",
+      "variant": "emphasis"
+    },
+    {
+      "id": "turn",
+      "from": "api",
+      "to": "orch",
+      "label": "scrubbed turn",
+      "variant": "emphasis"
+    },
+    {
+      "id": "llm",
+      "from": "orch",
+      "to": "claude",
+      "label": "masked context only",
+      "variant": "security"
+    },
+    {
+      "id": "call-tools",
+      "from": "orch",
+      "to": "tools",
+      "label": "tool calls",
+      "variant": "emphasis"
+    },
+    {
+      "id": "compute",
+      "from": "tools",
+      "to": "engines",
+      "label": "diff · simulate",
+      "variant": "emphasis"
+    },
+    {
+      "id": "read",
+      "from": "engines",
+      "to": "pg",
+      "label": "read model",
+      "variant": "emphasis",
+      "labelDy": 24
+    },
+    {
+      "id": "gate",
+      "from": "orch",
+      "to": "gates",
+      "label": "each sentence",
+      "labelDy": 24
+    },
+    {
+      "id": "propose",
+      "from": "tools",
+      "to": "actions",
+      "label": "propose only",
+      "labelDy": 24
+    },
+    {
+      "id": "execute",
+      "from": "actions",
+      "to": "bss",
+      "label": "key pa-{id}"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Primary path",
+      "items": [
+        "Question → REST API → ChatOrchestrator",
+        "Tools call Java engines; the LLM never does arithmetic",
+        "Answer streams back as gated SSE sentences"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Trust boundary",
+      "items": [
+        "Identity comes from the SecurityContext, never tool arguments",
+        "Only scrubbed text and masked MSISDNs reach Claude",
+        "Failed gate or no LLM → template answer"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Planned, not built",
+      "items": [
+        "Redis cache and rate limits (Phase 7)",
+        "Kafka topics and proactive-worker (Phase 7)",
+        "Today: one process, mock BSS in-process"
+      ]
+    }
+  ]
+}

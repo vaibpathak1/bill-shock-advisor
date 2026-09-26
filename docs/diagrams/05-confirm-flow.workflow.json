@@ -1,0 +1,265 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "Confirm flow: idempotent action execution",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "happy",
+        "label": "Confirm to EXECUTED",
+        "focus": [
+          "click",
+          "claim",
+          "recheck",
+          "executing",
+          "execute",
+          "t2",
+          "response"
+        ],
+        "note": "One confirm, one claimed key, one BSS effect."
+      },
+      {
+        "id": "idempotency",
+        "label": "Same key again",
+        "focus": [
+          "click",
+          "claim",
+          "replay"
+        ],
+        "note": "A retry or double click replays the stored response."
+      },
+      {
+        "id": "unknown",
+        "label": "Unknown outcome",
+        "focus": [
+          "execute",
+          "unknown",
+          "redrive"
+        ],
+        "note": "Timeouts leave the action EXECUTING; a re-drive resends the same BSS key."
+      }
+    ],
+    "viewBox": [
+      1080,
+      660
+    ]
+  },
+  "lanes": [
+    {
+      "id": "client",
+      "label": "Chat page"
+    },
+    {
+      "id": "t1",
+      "label": "ProposedActionService (T1)"
+    },
+    {
+      "id": "bss",
+      "label": "Executor + mock BSS"
+    },
+    {
+      "id": "exceptions",
+      "label": "Stops and recovery",
+      "variant": "exception"
+    }
+  ],
+  "mainPath": [
+    "click",
+    "claim",
+    "recheck",
+    "executing",
+    "execute",
+    "t2",
+    "response"
+  ],
+  "nodes": [
+    {
+      "id": "click",
+      "lane": "client",
+      "col": 0,
+      "type": "frontend",
+      "label": "Confirm",
+      "sublabel": "randomUUID key",
+      "tag": "reused on retry"
+    },
+    {
+      "id": "claim",
+      "lane": "t1",
+      "col": 1,
+      "type": "security",
+      "label": "Claim key",
+      "sublabel": "IN_PROGRESS row"
+    },
+    {
+      "id": "recheck",
+      "lane": "t1",
+      "col": 2,
+      "type": "security",
+      "label": "Re-check",
+      "sublabel": "expiry + rules"
+    },
+    {
+      "id": "executing",
+      "lane": "t1",
+      "col": 3,
+      "type": "backend",
+      "label": "→ EXECUTING",
+      "sublabel": "version = v"
+    },
+    {
+      "id": "execute",
+      "lane": "bss",
+      "col": 4,
+      "type": "external",
+      "label": "BSS steps",
+      "sublabel": "key pa-{id}",
+      "tag": "no DB txn open"
+    },
+    {
+      "id": "t2",
+      "lane": "bss",
+      "col": 5,
+      "type": "database",
+      "label": "T2: outcome",
+      "sublabel": "EXECUTED / FAILED"
+    },
+    {
+      "id": "response",
+      "lane": "client",
+      "col": 5,
+      "type": "frontend",
+      "label": "Response",
+      "sublabel": "stored body"
+    },
+    {
+      "id": "replay",
+      "lane": "exceptions",
+      "col": 1,
+      "type": "security",
+      "label": "Key exists",
+      "sublabel": "replay · 409 · 422"
+    },
+    {
+      "id": "stop",
+      "lane": "exceptions",
+      "col": 2,
+      "type": "security",
+      "label": "No execution",
+      "sublabel": "409 · hand-off"
+    },
+    {
+      "id": "unknown",
+      "lane": "exceptions",
+      "col": 4,
+      "type": "messagebus",
+      "label": "Outcome unknown",
+      "sublabel": "202 · EXECUTING",
+      "width": 116
+    },
+    {
+      "id": "redrive",
+      "lane": "exceptions",
+      "col": 3,
+      "type": "backend",
+      "label": "Re-drive",
+      "sublabel": "same steps"
+    }
+  ],
+  "edges": [
+    {
+      "from": "click",
+      "to": "claim",
+      "label": "POST confirm",
+      "variant": "emphasis",
+      "role": "main",
+      "fromSide": "right",
+      "toSide": "top"
+    },
+    {
+      "from": "claim",
+      "to": "recheck",
+      "label": "new key",
+      "role": "main"
+    },
+    {
+      "from": "recheck",
+      "to": "executing",
+      "label": "PROPOSE",
+      "role": "main"
+    },
+    {
+      "from": "executing",
+      "to": "execute",
+      "label": "commit T1",
+      "variant": "emphasis",
+      "role": "main"
+    },
+    {
+      "from": "execute",
+      "to": "t2",
+      "label": "receipts",
+      "role": "main"
+    },
+    {
+      "from": "t2",
+      "to": "response",
+      "label": "200",
+      "variant": "emphasis",
+      "role": "main"
+    },
+    {
+      "from": "claim",
+      "to": "replay",
+      "label": "same key",
+      "variant": "security",
+      "role": "error"
+    },
+    {
+      "from": "recheck",
+      "to": "stop",
+      "label": "not PROPOSE",
+      "variant": "security",
+      "role": "error"
+    },
+    {
+      "from": "execute",
+      "to": "unknown",
+      "label": "timeout · 5xx",
+      "variant": "security",
+      "role": "error",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "from": "unknown",
+      "to": "redrive",
+      "role": "branch"
+    },
+    {
+      "from": "redrive",
+      "to": "execute",
+      "label": "same key",
+      "variant": "dashed",
+      "role": "return"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Idempotency and re-check",
+      "items": [
+        "Key claimed first; response stored + replayed",
+        "Guardrails re-run; amount changed → 409"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "BSS outside the transaction",
+      "items": [
+        "T1 commits before BSS; T2 records outcome",
+        "Only a definite rejection → FAILED"
+      ]
+    }
+  ]
+}
