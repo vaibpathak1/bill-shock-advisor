@@ -157,7 +157,12 @@ class ToolsSeedIT {
             .contains("\"code\":\"PP_499\"")
             .contains("\"newBill\":{\"value\":\"588.82\",\"display\":\"₹588.82 incl. GST\"}")
             .contains("\"saving\":{\"value\":\"317.00\",\"display\":\"₹317.00 incl. GST\"}")
+            .contains("\"savingExclGst\":{\"value\":\"268.64\",\"display\":\"₹268.64 excl. GST\"}")
             .contains("DATA_10GB");
+        // The before-GST saving a scenario-1 goodwill credit is grounded in (A-110; actions.md §3.1).
+        assertThat(call(1001, "simulatePlans", "{}")).contains("IR_GCC_7D")
+            .contains("\"saving\":{\"value\":\"1033.68\",\"display\":\"₹1,033.68 incl. GST\"}")
+            .contains("\"savingExclGst\":{\"value\":\"876.00\",\"display\":\"₹876.00 excl. GST\"}");
         assertThat(call(1004, "simulatePlans", "{}")).contains("RECENT_PLAN_CHANGE")
             .contains("\"planChangedOn\":\"2026-09-01\"").contains("\"plans\":[]");
         assertThat(call(1006, "simulatePlans", "{}")).contains("No plan or add-on would have made this bill cheaper");

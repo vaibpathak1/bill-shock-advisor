@@ -42,7 +42,8 @@ stateDiagram-v2
     APPROVED --> EXECUTING
     AUTO_APPROVED --> EXECUTING
     EXECUTING --> EXECUTED: BSS confirms
-    EXECUTING --> FAILED: BSS error (no retry without a new decision)
+    EXECUTING --> FAILED: BSS definitely rejects (amended 2026-09-26)
+    EXECUTING --> EXECUTING: unknown outcome, re-driven with the same key
     EXECUTED --> [*]
 ```
 
@@ -69,6 +70,17 @@ stateDiagram-v2
     stay confirmable by a human; `AUTO_APPROVED` stops being issued (NFR-20).
 - **Care-agent assisted mode** (A-40): a care agent may confirm on the customer's behalf
   only with a recorded verbal-consent flag, which is audited.
+
+**Amendment (2026-09-26, Phase 6a owner decisions; details in
+[actions.md](../../03-development/actions.md) §2, §6):**
+- Only a **definite** BSS rejection moves `EXECUTING → FAILED`. A timeout, connection error
+  or unknown result leaves the action `EXECUTING`, because the effect may have been applied.
+  Re-driving with the same BSS key `pa-{actionId}` is safe; a reconcile job (6b) re-drives
+  `EXECUTING` actions and never fails them automatically.
+- `ESCALATED` actions open their TMF621 ticket immediately, without customer confirmation
+  (a hand-off is not an account change), deduplicated per conversation.
+- At most one live action per target (`target_ref`), so two proposals of the same refund
+  can never both execute.
 
 ## Consequences
 

@@ -10,6 +10,10 @@ import java.util.List;
  */
 public interface TroubleTicketGateway {
 
+    /**
+     * @throws BssRejectedException the BSS definitely did not apply the request
+     * @throws BssUnavailableException the outcome is unknown (timeout, connection error); retry with the same key
+     */
     TicketReceipt createTicket(TicketRequest request);
 
     enum TicketType {

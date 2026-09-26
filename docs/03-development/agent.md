@@ -278,8 +278,11 @@ For the seed accounts it equals the whole bill, because VAS and duplicates are e
   blocked, and the answer falls back. Guardrail thresholds are never given to the model in
   5a, so they cannot leak, and any ₹ threshold is already blocked by the value rule.
 - **Action-claim gate:** a sentence that claims an action was done ("I have credited …",
-  "has been cancelled/refunded/changed …") is replaced by "I haven't changed anything on your
-  account; any change needs your confirmation first." In 5a no action can have run.
+  "has been cancelled/refunded …") is replaced by "I haven't changed anything on your
+  account; any change needs your confirmation first." In 5a no action could have run. **6a:** a
+  claim passes only when every effect it names (credit, refund, unsubscribe, barring, plan change,
+  add-on, dispute, escalation) has a `DONE` execution step in this conversation; see
+  [actions.md](actions.md) §12 and §13 item 6.
 - Counters: `grounding_violation_total{type=value|label|leak|action_claim}`.
 
 ### 8.2 Diagnosis gate and `bill_diagnosis` (5a Q-35)

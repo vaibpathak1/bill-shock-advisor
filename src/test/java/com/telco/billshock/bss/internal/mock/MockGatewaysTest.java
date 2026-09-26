@@ -1,5 +1,6 @@
 package com.telco.billshock.bss.internal.mock;
 
+import com.telco.billshock.bss.BssRejectedException;
 import com.telco.billshock.bss.CustomerBillGateway.AdjustmentRequest;
 import com.telco.billshock.bss.CustomerBillGateway.AdjustmentType;
 import com.telco.billshock.bss.ProductInventoryGateway.ActiveProduct;
@@ -21,6 +22,7 @@ import java.math.BigDecimal;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** The fixtures of seed-scenarios.md §6, served by the in-process mocks. */
 class MockGatewaysTest {
@@ -60,7 +62,7 @@ class MockGatewaysTest {
     @Test
     void ordersAreIdempotentPerKey() {
         var gateway = new MockProductInventoryGateway(jsonMapper);
-        var request = new OrderRequest(AccountId.of(1003), OrderAction.VAS_UNSUBSCRIBE, "SUB-1003-VAS-ASTRO", null, "key-1");
+        var request = new OrderRequest(AccountId.of(1003), OrderAction.VAS_UNSUBSCRIBE, "SUB-1003-VAS-ASTRO", null, null, "key-1");
 
         var first = gateway.submitOrder(request);
         var second = gateway.submitOrder(request);
@@ -125,5 +127,17 @@ class MockGatewaysTest {
     private static BigDecimal quantity(List<UsageSession> sessions, UsageKind kind) {
         return sessions.stream().filter(s -> s.kind() == kind).map(UsageSession::quantity)
             .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    /** A definite rejection (actions.md §6.3): nothing applied, so no receipt is kept for the key. */
+    @Test
+    void unsubscribingAServiceTheAccountDoesNotHoldIsADefiniteRejection() {
+        var inventory = new MockProductInventoryGateway(jsonMapper);
+        var request = new OrderRequest(AccountId.of(1002), OrderAction.VAS_UNSUBSCRIBE, "SUB-1003-VAS-ASTRO", null, null,
+                "key-reject");
+
+        assertThatThrownBy(() -> inventory.submitOrder(request)).isInstanceOf(BssRejectedException.class)
+            .satisfies(e -> assertThat(((BssRejectedException) e).code()).isEqualTo("UNKNOWN_SUBSCRIPTION"));
+        assertThat(inventory.submittedOrders()).isEmpty();
     }
 }

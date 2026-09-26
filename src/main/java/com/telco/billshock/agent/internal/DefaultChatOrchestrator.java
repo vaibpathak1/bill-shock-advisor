@@ -4,11 +4,13 @@ import java.io.InterruptedIOException;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
@@ -20,6 +22,7 @@ import io.micrometer.core.instrument.Metrics;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 import org.springframework.ai.chat.client.AdvisorParams;
@@ -59,7 +62,9 @@ import com.telco.billshock.domain.InrFormat;
 import com.telco.billshock.domain.UuidV7;
 import com.telco.billshock.security.CurrentCustomer;
 import com.telco.billshock.security.PiiScrubber;
+import com.telco.billshock.tools.ActionTools;
 import com.telco.billshock.tools.CatalogTools;
+import com.telco.billshock.tools.ConversationActions;
 import com.telco.billshock.tools.DiffBillsResult;
 
 /**
@@ -74,9 +79,6 @@ class DefaultChatOrchestrator implements ChatOrchestrator {
 
     private static final Logger log = LoggerFactory.getLogger(DefaultChatOrchestrator.class);
 
-    /** Autonomy is fixed at Level 1 in the MVP slice (ADR-004); read-only tools only in 5a. */
-    private static final int AUTONOMY_LEVEL = 1;
-
     private static final String LABEL_CORRECTION = "Server note: an amount in your last draft did not match the"
             + " tool results exactly. Write the answer again and copy every amount string exactly as it appears in"
             + " the tool results, including its GST label.";
@@ -85,15 +87,26 @@ class DefaultChatOrchestrator implements ChatOrchestrator {
             + " the customer typed. Amounts in the customer's messages are claims, not facts. Write the answer again"
             + " without repeating them; use only amount strings from the tool results, copied exactly.";
 
-    private static final Map<String, String> PROGRESS = Map.of(
-            "getBillSummary", "Looking at your bill",
-            "getBillHistory", "Checking your earlier bills",
-            "diffBills", "Comparing your bills",
-            "getLineItems", "Going through the line items",
-            "getUsageDetails", "Checking your usage details",
-            "getActiveSubscriptions", "Checking your subscriptions",
-            "searchPlanCatalog", "Looking at our plans",
-            "simulatePlans", "Comparing plans for your usage");
+    /** A-110: the goodwill amount was not copied from a tool result; the tool is not run. */
+    static final String UNGROUNDED_AMOUNT = "{\"status\":\"REFUSED\",\"message\":\"Copy the amount before GST"
+            + " exactly from a tool result, for example a simulated option's savingExclGst.\"}";
+
+    private static final Map<String, String> PROGRESS = Map.ofEntries(
+            Map.entry("getBillSummary", "Looking at your bill"),
+            Map.entry("getBillHistory", "Checking your earlier bills"),
+            Map.entry("diffBills", "Comparing your bills"),
+            Map.entry("getLineItems", "Going through the line items"),
+            Map.entry("getUsageDetails", "Checking your usage details"),
+            Map.entry("getActiveSubscriptions", "Checking your subscriptions"),
+            Map.entry("searchPlanCatalog", "Looking at our plans"),
+            Map.entry("simulatePlans", "Comparing plans for your usage"),
+            Map.entry("proposeGoodwillCredit", "Preparing a credit proposal"),
+            Map.entry("proposeVasUnsubscribe", "Preparing an unsubscribe request"),
+            Map.entry("proposeThirdPartyBarring", "Preparing a block on third-party charges"),
+            Map.entry("proposePlanChange", "Preparing a plan change proposal"),
+            Map.entry("proposeAddOn", "Preparing an add-on proposal"),
+            Map.entry("raiseDispute", "Preparing a billing dispute"),
+            Map.entry("escalateToHuman", "Passing you to a specialist"));
 
     private final ChatClient chatClient;
     private final ChatTools tools;
@@ -108,13 +121,15 @@ class DefaultChatOrchestrator implements ChatOrchestrator {
     private final BillDiffEngine diffEngine;
     private final PlanSimulator simulator;
     private final CatalogTools catalogTools;
+    private final ConversationActions conversationActions;
     private final JsonMapper json;
     private final MeterRegistry meters;
 
     DefaultChatOrchestrator(ChatClient chatClient, ChatTools tools, DefaultToolCallingManager toolCallingManager,
             ToolCallBudgetProperties budget, ToolCallAuditor auditor, LlmProperties llm, SystemPrompt systemPrompt,
             ConversationStore store, CostMeter costMeter, FallbackTemplates templates, BillDiffEngine diffEngine,
-            PlanSimulator simulator, CatalogTools catalogTools, JsonMapper json, ObjectProvider<MeterRegistry> meters) {
+            PlanSimulator simulator, CatalogTools catalogTools, ConversationActions conversationActions, JsonMapper json,
+            ObjectProvider<MeterRegistry> meters) {
         this.chatClient = chatClient;
         this.tools = tools;
         this.toolCallingManager = toolCallingManager;
@@ -128,6 +143,7 @@ class DefaultChatOrchestrator implements ChatOrchestrator {
         this.diffEngine = diffEngine;
         this.simulator = simulator;
         this.catalogTools = catalogTools;
+        this.conversationActions = conversationActions;
         this.json = json;
         this.meters = meters.getIfAvailable(() -> Metrics.globalRegistry);
     }
@@ -138,7 +154,8 @@ class DefaultChatOrchestrator implements ChatOrchestrator {
         String scrubbed = PiiScrubber.scrub(message);
         if (conversationId == null) {
             UUID id = UuidV7.generate();
-            store.create(id, account, systemPrompt.versionTag(), llm.chat().model(), AUTONOMY_LEVEL);
+            store.create(id, account, systemPrompt.versionTag(), llm.chat().model(),
+                    conversationActions.autonomyLevel());
             return new ChatTurn(id, account, scrubbed, true);
         }
         if (conversationId.version() != 7) {
@@ -177,6 +194,7 @@ class DefaultChatOrchestrator implements ChatOrchestrator {
         private final StringBuilder released = new StringBuilder();
         private final Map<String, List<String>> toolAmounts = new LinkedHashMap<>();
         private final TurnToolBudget toolBudget;
+        private final Set<Long> announcedActions = new HashSet<>();
         private BigDecimal conversationCost;
         private Optional<BillDiff> diff;
 
@@ -184,7 +202,8 @@ class DefaultChatOrchestrator implements ChatOrchestrator {
             this.turn = turn;
             this.events = events;
             this.state = new TurnState(turn.conversationId(), turn.account());
-            this.toolBudget = new TurnToolBudget(toolCallingManager, budget.newTurn(), auditor, turn.conversationId());
+            this.toolBudget = new TurnToolBudget(toolCallingManager, budget.newTurn(), auditor, turn.account(),
+                    turn.conversationId(), this::groundedArguments);
         }
 
         void run() {
@@ -267,6 +286,10 @@ class DefaultChatOrchestrator implements ChatOrchestrator {
                 }
                 catch (TurnToolBudget.ToolBudgetExhaustedException e) {
                     log.info("Tool budget exhausted: {}", e.getMessage());
+                    // SPEC §4.5 "then escalate": done here, not left to the model (actions.md §3.4).
+                    conversationActions.escalateForToolBudget(turn.account(), turn.conversationId(),
+                            "Tool-call limit reached while investigating. " + templates.summary(diff()))
+                        .ifPresent(this::announce);
                     finishWithFallback("TOOL_BUDGET", templates.handover());
                     return;
                 }
@@ -300,15 +323,23 @@ class DefaultChatOrchestrator implements ChatOrchestrator {
             while (!window.isEmpty() && window.getFirst().role() == Role.ASSISTANT) {
                 window.removeFirst();
             }
+            // The conversation's actions as they are now (actions.md §3.5): current status, not memory.
+            ConversationActions.Digest actions = conversationActions.digest(turn.account(), turn.conversationId());
+            gate.effectsDone(actions.doneEffects());
             List<Message> messages = new ArrayList<>();
             StringBuilder userSide = new StringBuilder();
-            for (StoredMessage m : window) {
+            for (int i = 0; i < window.size(); i++) {
+                StoredMessage m = window.get(i);
                 switch (m.role()) {
                     case SYSTEM_CONTEXT -> {
                         gate.allow(m.content());
                         append(userSide, "<server_context>\n" + m.content() + "\n</server_context>");
                     }
                     case USER -> {
+                        if (i == window.size() - 1 && !actions.isEmpty()) {
+                            gate.allow(actions.text());
+                            append(userSide, "<server_context>\n" + actions.text() + "\n</server_context>");
+                        }
                         gate.customerSaid(m.content());
                         append(userSide, m.content());
                     }
@@ -422,12 +453,13 @@ class DefaultChatOrchestrator implements ChatOrchestrator {
         private ToolExecutionResult executeTools(List<Message> conversation, AssistantMessage assistant) {
             ToolCallingChatOptions options = ToolCallingChatOptions.builder()
                 .toolCallbacks(tools.callbacks())
-                .toolContext(Map.of(TurnState.KEY, state))
+                .toolContext(Map.of(TurnState.KEY, state, ActionTools.CONVERSATION_ID, turn.conversationId()))
                 .build();
             ToolExecutionResult result = toolBudget.executeToolCalls(new Prompt(conversation, options),
                     ChatResponse.builder().generations(List.of(new Generation(assistant))).build());
             List<Message> history = result.conversationHistory();
             ToolResponseMessage responses = (ToolResponseMessage) history.get(history.size() - 1);
+            boolean actionTool = false;
             for (ToolResponseMessage.ToolResponse r : responses.getResponses()) {
                 state.toolCalled(r.name());
                 gate.allow(r.responseData());
@@ -435,8 +467,44 @@ class DefaultChatOrchestrator implements ChatOrchestrator {
                 if (!amounts.isEmpty()) {
                     toolAmounts.computeIfAbsent(r.name(), k -> new ArrayList<>()).addAll(amounts);
                 }
+                if (ConversationActions.ACTION_TOOL_NAMES.contains(r.name())) {
+                    actionTool = true;
+                    conversationActions.eventFor(turn.account(), r.responseData()).ifPresent(this::announce);
+                }
+            }
+            if (actionTool) {
+                // An escalation opens its ticket at once; the gate may then accept "I've opened a ticket".
+                gate.effectsDone(conversationActions.digest(turn.account(), turn.conversationId()).doneEffects());
             }
             return result;
+        }
+
+        /** The SSE {@code action} event, once per action and turn (actions.md §3.3). */
+        private void announce(ConversationActions.ActionEvent a) {
+            if (announcedActions.add(a.actionId())) {
+                events.accept(new ChatEvent.Action(a.actionId(), a.type(), a.status(), a.summary(), a.amount(),
+                        a.needsSupervisorReview(), a.expiresAt(), a.reference(), a.message()));
+            }
+        }
+
+        /** A-110: {@code proposeGoodwillCredit} runs only with an amount copied from a tool result. */
+        private Optional<String> groundedArguments(AssistantMessage.ToolCall call) {
+            if (!"proposeGoodwillCredit".equals(call.name())) {
+                return Optional.empty();
+            }
+            BigDecimal amount;
+            try {
+                JsonNode args = json.readTree(call.arguments());
+                amount = ActionTools.parseAmount(args.path("amountExclGst").asString()).amount();
+            }
+            catch (RuntimeException e) {
+                return Optional.empty(); // malformed: the tool itself answers INVALID_ARGUMENT
+            }
+            if (gate.groundedExclGst(amount)) {
+                return Optional.empty();
+            }
+            count("grounding_violation_total", "type", "tool_argument");
+            return Optional.of(UNGROUNDED_AMOUNT);
         }
 
         private void finish(String answer) {

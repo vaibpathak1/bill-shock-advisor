@@ -40,20 +40,29 @@ public class GuardrailContextFactory {
     private final CatalogReadModel catalog;
     private final ProductInventoryGateway inventory;
     private final GuardrailProperties properties;
+    private final CreditHistory credits;
     private final Clock clock;
 
     @Autowired
     public GuardrailContextFactory(BillingReadModel billing, CatalogReadModel catalog,
-            ProductInventoryGateway inventory, GuardrailProperties properties, ObjectProvider<Clock> clock) {
-        this(billing, catalog, inventory, properties, clock.getIfAvailable(() -> Clock.system(INDIA)));
+            ProductInventoryGateway inventory, GuardrailProperties properties, CreditHistory credits,
+            ObjectProvider<Clock> clock) {
+        this(billing, catalog, inventory, properties, credits, clock.getIfAvailable(() -> Clock.system(INDIA)));
+    }
+
+    /** Without a workflow: only credits on the bills count (unit tests). */
+    public GuardrailContextFactory(BillingReadModel billing, CatalogReadModel catalog,
+            ProductInventoryGateway inventory, GuardrailProperties properties, Clock clock) {
+        this(billing, catalog, inventory, properties, CreditHistory.NONE, clock);
     }
 
     public GuardrailContextFactory(BillingReadModel billing, CatalogReadModel catalog,
-            ProductInventoryGateway inventory, GuardrailProperties properties, Clock clock) {
+            ProductInventoryGateway inventory, GuardrailProperties properties, CreditHistory credits, Clock clock) {
         this.billing = billing;
         this.catalog = catalog;
         this.inventory = inventory;
         this.properties = properties;
+        this.credits = credits;
         this.clock = clock;
     }
 
@@ -76,7 +85,13 @@ public class GuardrailContextFactory {
                 .filter(l -> l.billId() == b.billId())
                 .toList()))
             .orElse(Set.of());
-        boolean priorCredit = bill.map(b -> hasPriorCredit(b.billPeriod(), bills, lineItems)).orElse(false);
+        boolean priorCredit = bill.map(b -> hasPriorCredit(b.billPeriod(), bills, lineItems)
+                || credits.goodwillCreditSince(accountId, b.billPeriod()
+                    .minusMonths(properties.goodwill().priorCreditLookbackMonths())
+                    .firstDay()
+                    .atStartOfDay(INDIA)
+                    .toInstant()))
+            .orElse(false);
 
         LocalDate today = LocalDate.now(clock);
         return new GuardrailContext(accountId, properties.autonomyLevel(), bill, bills, lineItems, duplicates,
@@ -98,7 +113,11 @@ public class GuardrailContextFactory {
         return bills.stream().filter(b -> b.billId() == billId).findFirst();
     }
 
-    /** CREDIT lines, or negative ADJUSTMENT lines, on the bill or in the lookback months before it (A-85). */
+    /**
+     * CREDIT lines, or negative ADJUSTMENT lines, on the bill or in the lookback months before it (A-85).
+     * Goodwill credits issued through this system since the start of that window count as well
+     * ({@link CreditHistory}, actions.md §5.2).
+     */
     private boolean hasPriorCredit(BillPeriod period, List<BillSummary> bills, Map<Long, LineItem> lineItems) {
         BillPeriod from = period.minusMonths(properties.goodwill().priorCreditLookbackMonths());
         Set<Long> window = bills.stream()

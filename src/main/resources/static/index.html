@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bill Shock Advisor</title>
+  <link rel="stylesheet" href="app.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <div id="banner" class="banner" hidden></div>
+  <header class="top">
+    <h1>Bill Shock Advisor</h1>
+    <span id="who" class="who"></span>
+  </header>
+
+  <main>
+    <section id="login" class="card">
+      <h2>Sign in as a demo customer</h2>
+      <form id="login-form">
+        <label>Customer
+          <select id="user">
+            <option value="cust1001">cust1001 · UAE roaming, no pack</option>
+            <option value="cust1002">cust1002 · Data overage</option>
+            <option value="cust1003">cust1003 · VAS without opt-in</option>
+            <option value="cust1004">cust1004 · Mid-cycle plan change</option>
+            <option value="cust1005">cust1005 · Duplicate charge</option>
+            <option value="cust1006">cust1006 · Normal bill</option>
+          </select>
+        </label>
+        <label>Demo password
+          <input id="password" type="password" autocomplete="off" required>
+        </label>
+        <button type="submit">Sign in</button>
+        <p id="login-error" class="error" hidden></p>
+      </form>
+    </section>
+
+    <section id="chat" class="chat" hidden>
+      <div id="messages" class="messages" aria-live="polite"></div>
+      <div id="progress" class="progress" hidden></div>
+      <form id="chat-form" class="composer">
+        <input id="message" maxlength="2000" autocomplete="off" placeholder="Ask about your bill">
+        <button type="submit" id="send">Send</button>
+      </form>
+      <div class="actions-bar">
+        <button type="button" id="new-chat" class="link">New chat</button>
+        <button type="button" id="refresh-actions" class="link">My requests</button>
+        <button type="button" id="logout" class="link">Sign out</button>
+      </div>
+      <section id="my-actions" class="card" hidden>
+        <h2>My requests</h2>
+        <div id="action-list"></div>
+      </section>
+    </section>
+  </main>
+</body>
+</html>

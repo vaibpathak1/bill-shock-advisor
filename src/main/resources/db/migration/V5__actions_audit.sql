@@ -16,6 +16,8 @@ CREATE TABLE proposed_action (
     gst_amount          numeric(14,2) CHECK (gst_amount >= 0),      -- credits/refunds include GST (Q-20)
     currency            char(3)       NOT NULL DEFAULT 'INR',
     params              jsonb         NOT NULL DEFAULT '{}'::jsonb,
+    target_ref          text          NOT NULL,                     -- dedupe key (actions.md §5.3)
+    execution           jsonb         NOT NULL DEFAULT '[]'::jsonb, -- one entry per BSS step (actions.md §6.2)
     guardrail_result    jsonb,
     requires_supervisor boolean       NOT NULL DEFAULT false,
     idempotency_key     text          UNIQUE,
@@ -30,15 +32,27 @@ CREATE TABLE proposed_action (
     CHECK ((amount IS NULL) = (gst_amount IS NULL))
 );
 
--- X2: guardrail "no goodwill credit in the last 6 months"
-CREATE INDEX proposed_action_credit_history_idx ON proposed_action (account_id, executed_at)
-    WHERE action_type = 'GOODWILL_CREDIT' AND status = 'EXECUTED';
+-- X2: guardrail "no goodwill credit in the last 6 months". EXECUTING counts too: its credit may
+-- already be applied (actions.md §5.2, A-112).
+CREATE INDEX proposed_action_credit_history_idx ON proposed_action (account_id, decided_at)
+    WHERE action_type = 'GOODWILL_CREDIT' AND status IN ('EXECUTING', 'EXECUTED');
+-- At most one live action per target; executed money-out, barring and disputes block repeats
+-- (actions.md §5.3). A conflict returns the existing action instead of a new one.
+CREATE UNIQUE INDEX proposed_action_target_uq ON proposed_action (account_id, action_type, target_ref)
+    WHERE status IN ('PENDING_CONFIRMATION', 'AWAITING_SUPERVISOR', 'APPROVED', 'AUTO_APPROVED', 'EXECUTING',
+                     'ESCALATED')
+       OR (status = 'EXECUTED' AND action_type IN ('GOODWILL_CREDIT', 'VAS_UNSUBSCRIBE', 'THIRD_PARTY_BARRING',
+                                                   'DISPUTE'));
+-- Conversation digest (actions.md §3.5)
+CREATE INDEX proposed_action_conversation_idx ON proposed_action (conversation_id)
+    WHERE conversation_id IS NOT NULL;
 -- X3: GET /api/v1/actions?status=
 CREATE INDEX proposed_action_account_status_idx ON proposed_action (account_id, status, created_at DESC);
 -- Expiry sweep
 CREATE INDEX proposed_action_expiry_idx ON proposed_action (expires_at)
     WHERE status = 'PENDING_CONFIRMATION';
 
+-- response_status 0 = the first request with this key is still running (actions.md §6.6).
 CREATE TABLE idempotency_record (
     account_id      bigint      NOT NULL REFERENCES account (account_id),
     idempotency_key text        NOT NULL,

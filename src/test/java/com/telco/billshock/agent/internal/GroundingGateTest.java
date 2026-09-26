@@ -2,6 +2,10 @@ package com.telco.billshock.agent.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.Set;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -109,6 +113,56 @@ class GroundingGateTest {
         GroundingGate.Result r = gate.check(sentence);
         assertThat(r.actionClaimRewritten()).isFalse();
         assertThat(r.text()).isEqualTo(sentence);
+    }
+
+    /** actions.md §12: a claim passes only for effects the BSS confirmed (execution receipts). */
+    @Test
+    void aPartiallyExecutedVasAllowsTheUnsubscribeClaimAndBlocksAnyRefundClaim() {
+        GroundingGate g = gate();
+        g.effectsDone(Set.of("UNSUBSCRIBE"));
+
+        assertThat(g.check("Astro Daily has been cancelled.").actionClaimRewritten()).isFalse();
+        assertThat(g.check("I have unsubscribed you from Astro Daily.").actionClaimRewritten()).isFalse();
+        assertThat(g.check("Astro Daily has been cancelled; the refund will be handled manually by our billing team.")
+            .actionClaimRewritten()).isFalse();
+        for (String refundClaim : List.of("Your refund has been processed.", "We have refunded the charges.",
+                "Astro Daily has been cancelled and the refund has been processed.")) {
+            GroundingGate.Result r = g.check(refundClaim);
+            assertThat(r.actionClaimRewritten()).as(refundClaim).isTrue();
+            assertThat(r.text()).isEqualTo(GroundingGate.PARTIAL_CLAIM_REPLACEMENT);
+        }
+    }
+
+    @Test
+    void claimsPassOnlyForEffectsThatAreDone() {
+        GroundingGate g = gate();
+        g.effectsDone(Set.of("UNSUBSCRIBE", "REFUND", "DISPUTE"));
+
+        assertThat(g.check("Astro Daily has been cancelled and refunded.").actionClaimRewritten()).isFalse();
+        assertThat(g.check("I have raised the dispute.").actionClaimRewritten()).isFalse();
+        assertThat(g.check("I have credited your account.").actionClaimRewritten()).isTrue();
+        assertThat(g.check("I have switched your plan.").actionClaimRewritten()).isTrue();
+        // A generic verb naming no known effect is never accepted.
+        assertThat(g.check("I have processed everything.").actionClaimRewritten()).isTrue();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "Your bill has been issued on 1 September.",
+            "The new rental has been applied from 1 September.",
+            "Your plan changed on 1 September, so this bill has two part-month rentals." })
+    void billExplanationsAreNotClaims(String sentence) {
+        assertThat(gate.check(sentence).actionClaimRewritten()).isFalse();
+    }
+
+    /** A-110: a goodwill amount must be an excl. GST amount from the tool results. */
+    @Test
+    void onlyExclGstAmountsFromToolResultsGroundAGoodwillArgument() {
+        assertThat(gate.groundedExclGst(new BigDecimal("1775.00"))).isTrue();
+        assertThat(gate.groundedExclGst(new BigDecimal("1775"))).isTrue();
+        assertThat(gate.groundedExclGst(new BigDecimal("2094.50"))).isFalse(); // only allowed incl. GST
+        assertThat(gate.groundedExclGst(new BigDecimal("319.50"))).isFalse();  // a GST component
+        assertThat(gate.groundedExclGst(new BigDecimal("500.00"))).isFalse();  // never in a tool result
     }
 
     @Test

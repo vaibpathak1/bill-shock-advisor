@@ -48,6 +48,18 @@ public sealed interface ChatEvent {
         }
     }
 
+    /**
+     * A proposal created or found in this turn (actions.md §3.3). Server wording only; the chat page
+     * shows Confirm/Reject for {@code PENDING_CONFIRMATION}.
+     */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    record Action(long actionId, String type, String status, String summary, String amount,
+            boolean needsSupervisorReview, String expiresAt, String reference, String message) implements ChatEvent {
+        public String name() {
+            return "action";
+        }
+    }
+
     record Diagnosis(DiagnosisView diagnosis) implements ChatEvent {
         public String name() {
             return "diagnosis";

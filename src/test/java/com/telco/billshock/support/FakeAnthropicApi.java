@@ -9,6 +9,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.function.Function;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
 
@@ -29,6 +30,7 @@ public final class FakeAnthropicApi {
     private final HttpServer server;
     private final ConcurrentLinkedQueue<Script> scripts = new ConcurrentLinkedQueue<>();
     private final List<String> requests = new CopyOnWriteArrayList<>();
+    private volatile Function<String, Script> selector;
 
     private FakeAnthropicApi() {
         try {
@@ -50,10 +52,19 @@ public final class FakeAnthropicApi {
         return "http://127.0.0.1:" + server.getAddress().getPort();
     }
 
-    /** Clears scripts and recorded requests (call in {@code @BeforeEach}). */
+    /** Clears scripts, the selector and recorded requests (call in {@code @BeforeEach}). */
     public void reset() {
         scripts.clear();
         requests.clear();
+        selector = null;
+    }
+
+    /**
+     * Answers from the request body when no script is queued: the scripted demo and the scenario E2E
+     * tests pick the script by scenario and round ({@link ScenarioScripts#select}).
+     */
+    public void select(Function<String, Script> selector) {
+        this.selector = selector;
     }
 
     public void enqueue(Script... more) {
@@ -69,10 +80,16 @@ public final class FakeAnthropicApi {
     }
 
     private void handle(HttpExchange exchange) throws IOException {
+        String body;
         try (InputStream in = exchange.getRequestBody()) {
-            requests.add(new String(in.readAllBytes(), StandardCharsets.UTF_8));
+            body = new String(in.readAllBytes(), StandardCharsets.UTF_8);
         }
+        requests.add(body);
         Script script = scripts.poll();
+        Function<String, Script> select = selector;
+        if (script == null && select != null) {
+            script = select.apply(body);
+        }
         if (script == null) {
             script = Script.error(500);
         }
@@ -85,12 +102,12 @@ public final class FakeAnthropicApi {
             }
         }
         if (script.status != 200) {
-            byte[] body = ("{\"type\":\"error\",\"error\":{\"type\":\"api_error\",\"message\":\"scripted "
+            byte[] error = ("{\"type\":\"error\",\"error\":{\"type\":\"api_error\",\"message\":\"scripted "
                     + script.status + "\"}}").getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().add("content-type", "application/json");
-            exchange.sendResponseHeaders(script.status, body.length);
+            exchange.sendResponseHeaders(script.status, error.length);
             try (OutputStream out = exchange.getResponseBody()) {
-                out.write(body);
+                out.write(error);
             }
             return;
         }

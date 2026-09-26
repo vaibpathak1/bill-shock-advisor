@@ -8,6 +8,7 @@ import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.ai.chat.messages.AssistantMessage;
@@ -28,6 +29,8 @@ import com.telco.billshock.agent.ToolCallBudget;
 import com.telco.billshock.agent.ToolCallBudget.Admission;
 import com.telco.billshock.audit.ToolCallAuditor;
 import com.telco.billshock.audit.ToolCallAuditor.Outcome;
+import com.telco.billshock.domain.AccountId;
+import com.telco.billshock.security.PiiScrubber;
 
 /**
  * Decorator around the shared {@code DefaultToolCallingManager} that applies the per-turn
@@ -39,7 +42,10 @@ import com.telco.billshock.audit.ToolCallAuditor.Outcome;
  * <li>{@code ALREADY_CALLED_THIS_TURN}: not executed; a synthetic result says so; the turn goes on.</li>
  * <li>{@code LIMIT_REACHED}: {@link ToolBudgetExhaustedException}; the orchestrator escalates.</li>
  * </ul>
- * Every tool call, executed or refused, goes to the {@link ToolCallAuditor} (5a answer Q-33).
+ * An admitted call whose arguments fail the {@link ArgumentCheck} is not executed either: the model
+ * gets the check's result instead (the grounded goodwill amount, A-110; actions.md §3.1).
+ * Every tool call, executed or refused, goes to the {@link ToolCallAuditor} with PII-scrubbed
+ * arguments (5a answer Q-33).
  * One instance per turn; not thread-safe.
  */
 final class TurnToolBudget implements ToolCallingManager {
@@ -49,13 +55,28 @@ final class TurnToolBudget implements ToolCallingManager {
     private final ToolCallingManager delegate;
     private final ToolCallBudget budget;
     private final ToolCallAuditor auditor;
+    private final AccountId account;
     private final UUID conversationId;
+    private final ArgumentCheck argumentCheck;
 
-    TurnToolBudget(ToolCallingManager delegate, ToolCallBudget budget, ToolCallAuditor auditor, UUID conversationId) {
+    TurnToolBudget(ToolCallingManager delegate, ToolCallBudget budget, ToolCallAuditor auditor, AccountId account,
+            UUID conversationId, ArgumentCheck argumentCheck) {
         this.delegate = delegate;
         this.budget = budget;
         this.auditor = auditor;
+        this.account = account;
         this.conversationId = conversationId;
+        this.argumentCheck = argumentCheck;
+    }
+
+    /** Checks an admitted call's arguments before it runs. */
+    @FunctionalInterface
+    interface ArgumentCheck {
+
+        ArgumentCheck NONE = call -> Optional.empty();
+
+        /** @return the result to give the model instead of running the tool, or empty to run it */
+        Optional<String> refuse(ToolCall call);
     }
 
     @Override
@@ -77,14 +98,24 @@ final class TurnToolBudget implements ToolCallingManager {
         for (ToolCall call : original.getToolCalls()) {
             Admission admission = budget.admit(call.name());
             switch (admission) {
-                case ALLOWED -> admitted.add(call);
+                case ALLOWED -> {
+                    Optional<String> refusal = argumentCheck.refuse(call);
+                    if (refusal.isPresent()) {
+                        refused.put(call.id(), refusal.get());
+                        auditor.toolCalled(account, conversationId, call.name(), masked(call.arguments()),
+                                sha256(refusal.get()), Outcome.REFUSED_UNGROUNDED_ARGUMENT);
+                    }
+                    else {
+                        admitted.add(call);
+                    }
+                }
                 case ALREADY_CALLED_THIS_TURN -> {
                     refused.put(call.id(), ALREADY_DONE);
-                    auditor.toolCalled(conversationId, call.name(), call.arguments(), sha256(ALREADY_DONE),
-                            Outcome.REFUSED_ALREADY_CALLED);
+                    auditor.toolCalled(account, conversationId, call.name(), masked(call.arguments()),
+                            sha256(ALREADY_DONE), Outcome.REFUSED_ALREADY_CALLED);
                 }
                 case LIMIT_REACHED -> {
-                    auditor.toolCalled(conversationId, call.name(), call.arguments(), sha256(""),
+                    auditor.toolCalled(account, conversationId, call.name(), masked(call.arguments()), sha256(""),
                             Outcome.REFUSED_BUDGET);
                     throw new ToolBudgetExhaustedException(call.name());
                 }
@@ -112,7 +143,8 @@ final class TurnToolBudget implements ToolCallingManager {
                 executed.put(r.id(), r);
                 String args = admitted.stream().filter(c -> c.id().equals(r.id())).findFirst().map(ToolCall::arguments)
                     .orElse("");
-                auditor.toolCalled(conversationId, r.name(), args, sha256(r.responseData()), Outcome.EXECUTED);
+                auditor.toolCalled(account, conversationId, r.name(), masked(args), sha256(r.responseData()),
+                        Outcome.EXECUTED);
             }
         }
 
@@ -126,6 +158,10 @@ final class TurnToolBudget implements ToolCallingManager {
         history.add(original);
         history.add(ToolResponseMessage.builder().responses(merged).build());
         return ToolExecutionResult.builder().conversationHistory(history).build();
+    }
+
+    private static String masked(String arguments) {
+        return arguments == null ? null : PiiScrubber.scrub(arguments);
     }
 
     static String sha256(String text) {

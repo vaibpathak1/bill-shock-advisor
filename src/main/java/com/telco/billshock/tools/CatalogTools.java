@@ -129,7 +129,8 @@ public class CatalogTools {
 
     @Tool(name = "simulatePlans", description = """
             Re-rates the usage of one bill on every plan and add-on and returns up to 3 cheaper plans and the \
-            best single add-on, each with the new bill and the saving as separate amounts including GST. \
+            best single add-on, each with the new bill and the saving as separate amounts including GST, and the \
+            saving before GST. \
             Omit billPeriod for the latest bill. If the plan changed during that bill, no ranking is given.""")
     public ToolResult simulatePlans(
             @ToolParam(required = false, description = "Bill month as YYYY-MM; omit for the latest bill") String billPeriod) {
@@ -256,7 +257,12 @@ public class CatalogTools {
         public record CurrentPlan(String planCode, Amount planCharges) {
         }
 
-        public record Option(String code, String name, Amount price, Amount newBill, Amount saving) {
+        /**
+         * @param savingExclGst the same saving before GST: the only form a goodwill credit amount may take
+         *        (A-110; actions.md §3.1). Customers are shown {@code newBill} and {@code saving}
+         */
+        public record Option(String code, String name, Amount price, Amount newBill, Amount saving,
+                Amount savingExclGst) {
         }
 
         static SimulationResult from(PlanSimulation s) {
@@ -268,13 +274,14 @@ public class CatalogTools {
                             .stream()
                             .map(p -> new Option(p.planCode(), Untrusted.sanitize(p.planName()),
                                     Amount.plusGst(p.monthlyRental()), Amount.inclGst(p.totalInclGst()),
-                                    Amount.inclGst(p.savingInclGst())))
+                                    Amount.inclGst(p.savingInclGst()), Amount.exclGst(p.savingExclGst())))
                             .toList(),
                         s.bestAddOn() == null ? null
                                 : new Option(s.bestAddOn().addOnCode(), Untrusted.sanitize(s.bestAddOn().addOnName()),
                                         Amount.plusGst(s.bestAddOn().price()),
                                         Amount.inclGst(s.bestAddOn().totalInclGst()),
-                                        Amount.inclGst(s.bestAddOn().savingInclGst())),
+                                        Amount.inclGst(s.bestAddOn().savingInclGst()),
+                                        Amount.exclGst(s.bestAddOn().savingExclGst())),
                         null, null, null, null,
                         s.plans().isEmpty() && s.bestAddOn() == null
                                 ? "No plan or add-on would have made this bill cheaper. Say so; do not suggest a change."

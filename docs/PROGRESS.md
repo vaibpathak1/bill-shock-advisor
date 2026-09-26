@@ -7,7 +7,7 @@
 | 3a. Foundation (MVP slice) | **Done, approved** (owner, 2026-09-25). Gate-review changes applied; `./mvnw verify` passes | Scope: plan-and-budget §2a |
 | 4a. Deterministic core (MVP slice) | **Done, approved and committed** (owner, 2026-09-25); `./mvnw verify` passes (112 unit + 94 IT) | Design: `docs/03-development/deterministic-core.md` |
 | 5a. Agent (MVP slice) | **Gate review changes applied** (2026-09-25); `./mvnw verify` passes (201 unit + 121 IT). Live checks **deferred — run when API key is available** | Design: `docs/03-development/agent.md` |
-| 6a. Actions (MVP slice) + demo wrap-up | Not started | All 6 scenarios end to end |
+| 6a. Actions (MVP slice) + demo wrap-up | **Code gate** (2026-09-26): design approved; built; `./mvnw verify` passes (247 unit + 146 IT) | Design: `docs/03-development/actions.md` |
 | 3b. Foundation (remainder) | Not started | |
 | 4b. Deterministic core (remainder) | Not started | |
 | 5b. Agent (remainder) | Not started | Haiku-first routing decision (Q-13) |
@@ -234,6 +234,14 @@ the questions raised in the Phase 1 documents.
 | 2026-09-25 | 5a live checks: all three approved; run in order, command shown before each, tokens and cost reported | Repo owner |
 | 2026-09-25 | 5a live checks **skipped for now** (no API credits yet): Q-1, NFR-21 cache share and T-6 marked "deferred — run when API key is available", with the exact commands kept in PROGRESS.md | Repo owner |
 | 2026-09-25 | New AGENTS.md rule: never create, modify, move or delete `.env`; use a differently named temp file (e.g. `.env.test-tmp`) for experiments and remove only that | Repo owner |
+| 2026-09-26 | **Phase 6a go-ahead (plan answers).** Confirm flow: only a definite BSS rejection → `FAILED`; timeout/connection error/unknown → stays `EXECUTING`; re-drive with the same key `pa-{actionId}` is safe; EXECUTING reconcile job in 6b (described in actions.md); tests for timeout → EXECUTING and re-drive → exactly one BSS effect | Repo owner |
+| 2026-09-26 | 6a answer 1: scenario 1 goodwill = retroactively applying the roaming pack (pay-per-use minus pack price = ₹1,033.68 incl. GST), ending in `AWAITING_SUPERVISOR`; the demo shows scenario 3's VAS refund executing fully | Repo owner |
+| 2026-09-26 | 6a answer 2: `ESCALATED` opens the TMF621 ticket immediately without confirmation, deduplicated with `target_ref` | Repo owner |
+| 2026-09-26 | 6a answer 3: demo without an API key = option (c), scripted model via `spring-boot:test-run`, banner "Scripted model — not a live LLM" on the page and in the README | Repo owner |
+| 2026-09-26 | 6a answer 4: `GET /api/v1/bills/{period}/diagnosis` moves to 6b | Repo owner |
+| 2026-09-26 | 6a answer 5: V5 edited in place (`target_ref` + partial unique index) | Repo owner |
+| 2026-09-26 | 6a answer 6: separate design gate: actions.md reviewed before any 6a code | Repo owner |
+| 2026-09-26 | **6a design review:** all six choices accepted. Q-6a-3 clarified: a dispute's `target_ref` is its set of line items; Q-6a-4: the 409 and the agent tell the customer the amount changed and offer a fresh proposal; Q-6a-6: `/api/v1/meta` returns only the demo flag/banner and the version, with a test. Added: partial VAS execution (unsubscribe done, refund definitely rejected) is told as such, and the action-claim gate reads the execution receipts (allow the unsubscribe claim, block any refund claim), with a test. **Design approved; go-ahead for the code** after verifying `spring-boot:test-run` | Repo owner |
 | 2026-09-25 | Phase 2 answer 7: A-58 to A-65 accepted. A-63 limitation documented (usage up to the previous day; no in-trip real-time alerts in v1; real-time usage events as a future enhancement) | Repo owner |
 
 ## Notes for the Phase 3a session
@@ -659,22 +667,77 @@ Not in 5a (as planned): Haiku ChatClient and evals (5b); Resilience4j retry and 
 (5b); rate limiting (7); log masking (5b); the action tools, `escalateToHuman` and the audit
 writer (6a); the chat page and demo script (6a).
 
+## Phase 6a progress (2026-09-26)
+
+**Status: built, at the code gate.** `./mvnw verify` passes: 247 unit tests (was 201) and 146
+integration tests (was 121). Design approved at the design gate (actions.md §12 holds the review
+answers; §13 the implementation notes).
+
+Files (all uncommitted; the owner commits):
+- **Docs:**
+  - `actions.md` (design, review answers §12, implementation notes §13)
+  - ADR-004 amendment
+  - `assumptions.md` §11 (A-109 to A-119)
+  - `data-architecture.md` §4.4 and X2
+  - `agent.md` §8.1 (per-effect claim gate)
+  - README: scripted six-scenario demo, actions API
+- **Schema:** V5 edited in place: `target_ref`, `execution`, `proposed_action_target_uq`, X2 on
+  `EXECUTING`/`EXECUTED`, conversation index. **Run `docker compose down -v`** on a local database.
+- **Code by module** (list in actions.md §10):
+  - `bss`: `BssRejectedException`
+  - `actions`: the workflow, executors, idempotency, credit history
+  - `audit`: the JDBC writer (no-op removed)
+  - `tools`: the 7 action tools, `ConversationActions`, `savingExclGst`
+  - `agent`: registration per autonomy level, grounded goodwill argument, SSE `action` event,
+    budget escalation, digest, per-effect claim gate, prompt rules (`system.v1.st` edited in place)
+  - `api`: actions and meta controllers
+  - `security`: public page and meta, CSP
+  - static chat page
+- **Tests:** `ActionApiIT` (15), `ScenarioE2EIT` (7: one per scenario plus the partial-VAS case),
+  `MetaAndPageIT` (3), and unit tests for the runner, views, tools, registration and gate. The
+  mock BSS gateways are wrapped by `BssFaults` for fault injection and effect counts.
+- **Scripted demo:** `./mvnw spring-boot:test-run
+  -Dspring-boot.run.main-class=com.telco.billshock.demo.ScriptedDemoApplication` (test sources
+  only). Checked once against a throwaway PostgreSQL (not `.env`): banner, scenario 3 end to end,
+  and the page in a browser (confirm → EXECUTED, no console or CSP errors).
+
+Owner-requested behaviour, where it is tested:
+- Unknown BSS outcome stays `EXECUTING` (202); re-drive gives exactly one effect, for a lost
+  response and for a timeout before the BSS: `ActionApiIT`
+- Only a definite rejection → `FAILED`, never re-driven: `ActionApiIT`
+- Partial VAS: `FAILED`, receipts `UNSUBSCRIBE:DONE, REFUND:REJECTED`, customer message; next
+  turn allows "has been cancelled", rewrites "refund has been processed":
+  `ScenarioE2EIT.scenario3PartialExecution…`, `GroundingGateTest`
+- Changed amount → 409 `ACTION_NO_LONGER_VALID` with both amounts; the target is freed for a
+  fresh proposal: `ActionApiIT`
+- Disputes dedupe by line items, not bill: `ActionApiIT`
+- Escalation tickets at once, one per conversation; failed ticket opened by the re-drive:
+  `ActionApiIT`, `ChatApiIT`
+- `/api/v1/meta` exact key set: `MetaAndPageIT`
+
+Mutation checks (sources restored afterwards):
+- marking an unknown outcome `FAILED` fails 3 ITs
+- a claim gate that ignores the effects fails 2 unit tests
+
+Choices to confirm at the gate (actions.md §13):
+1. Confirm/reject Problem bodies are built in `actions`, since they are stored with the key.
+2. The stored body is `jsonb`, so replays keep key order and spacing normalised (the first
+   response is the stored text too).
+3. `APPROVED` is not a resting state in 6a; one guarded update goes to `EXECUTING`.
+4. A crash between T1 and T2 leaves the key "in progress"; the 6b job must complete it.
+5. The dispute overlap check is not race-proof for *different* overlapping sets (identical sets
+   are).
+6. Claim detection wording rules (§13 item 6).
+
+Open, carried forward:
+- live LLM checks still deferred (no API credits)
+- the scripted demo covers only the suggested first question per customer
+- the A-86 refund limitation stands
+- the 6b reconcile job must also complete "in progress" idempotency records
+
 ## Next step
 
-Phase 5a gate review changes are applied. The owner:
-- commits on `phase-5a-agent`
-- runs `docker compose down -v` before the next local run (V4 changed)
-- runs the deferred live checks once API credits exist
-
-Next: **Phase 6a** (actions and the demo wrap-up), after approval.
-
-Notes for 6a:
-- Implement `ToolCallAuditor` (Q-33) to write `audit_events`; the hook is already called for
-  every executed and refused tool call.
-- The action tools take the goodwill amount before GST (A-94), get the account from
-  `CurrentCustomer`, and call `GuardrailService.evaluate`. Register them in
-  `LlmConfiguration.chatTools` (sorted by name, so the cached prefix stays stable) and add
-  their progress wording in `DefaultChatOrchestrator.PROGRESS`.
-- The action-claim gate (agent.md §8.1) must then allow claims backed by an `EXECUTED` action
-  in the same turn.
-- *(Done in 5a: the simulation display rule and the `TurnToolBudget` wiring.)*
+Phase 6a code gate: the owner reviews the code and actions.md §13, then commits on
+`phase-6a-actions`. Before the next local run: `docker compose down -v` (V5 changed).
+After approval, the MVP demo slice is complete; next is **Phase 3b** (SPEC §11 order), after
+approval.

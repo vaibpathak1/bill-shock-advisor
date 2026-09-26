@@ -4,9 +4,9 @@ An agentic assistant that investigates unexpected spikes in a telecom customer's
 explains the root cause, proposes tailored resolutions and executes approved actions
 within guardrails. Specification: [SPEC.md](SPEC.md). Progress: [docs/PROGRESS.md](docs/PROGRESS.md).
 
-> Status: Phase 5a (agent) is done: `POST /api/v1/chat` streams a grounded bill explanation
-> (see "Demo without an API key"). Actions, the full demo script and the chat page arrive in
-> Phase 6a.
+> Status: the MVP demo slice (Phases 3a–6a) is built: grounded chat, proposed actions with
+> confirm/reject, a chat page, and a demo of all six scenarios that runs without an API key
+> (see "Scripted demo: all six scenarios").
 
 ## Prerequisites
 
@@ -73,9 +73,23 @@ With `LLM` mode this calls Anthropic and costs money:
 curl -N -u "cust1001:$DEMO_USER_PASSWORD" -H 'Content-Type: application/json' -d '{"message":"Why is my bill so high?"}' http://localhost:8080/api/v1/chat
 ```
 
-The first event is the deterministic `summary`; then `token` events (one checked sentence
-each), `diagnosis` and `done`. To continue the conversation, send the `conversationId` from
-`done` with the next message.
+The first event is the deterministic `summary`; then `progress` and `token` events (one checked
+sentence each), an `action` event for each proposal, `diagnosis` and `done`. To continue the
+conversation, send the `conversationId` from `done` with the next message.
+
+The chat page is at http://localhost:8080 (sign in with a demo user and `DEMO_USER_PASSWORD`).
+
+**Proposed actions** (docs/03-development/actions.md): the agent only *proposes*; the customer
+confirms or rejects. Confirm and reject need an `Idempotency-Key` header; repeating a request
+with the same key returns the stored response and never executes twice:
+
+```bash
+curl -s -u "cust1003:$DEMO_USER_PASSWORD" http://localhost:8080/api/v1/actions?status=PENDING_CONFIRMATION
+```
+
+```bash
+curl -s -u "cust1003:$DEMO_USER_PASSWORD" -X POST -H "Idempotency-Key: my-key-1" http://localhost:8080/api/v1/actions/1/confirm
+```
 
 **5. Connect with psql**, using the client inside the container (nothing to install):
 
@@ -114,6 +128,74 @@ when a checksum no longer matches.
 | `Validate failed: Migrations have failed validation` / checksum mismatch | A migration was edited after it ran | `docker compose down -v`, then start again |
 | Integration tests fail with `Could not find a valid Docker environment` | Docker is not running | Start Docker; `./mvnw test` (unit tests only) does not need it |
 
+## Scripted demo: all six scenarios
+
+> **Scripted model — not a live LLM.** This demo replaces only the model's words and tool
+> choices with fixed scripts (the same ones the scenario E2E tests use). Everything else runs
+> for real: the tools, the grounding gates, the guardrails, the proposal workflow, confirm with
+> idempotency, the mock BSS and the audit log. The page shows the same banner. No request can
+> reach Anthropic, and no key is needed or sent. The scripts live in test sources
+> (`src/test/java`) and are never part of the application jar.
+
+`.env` needs `POSTGRES_PASSWORD` (plus `POSTGRES_PORT` if 5432 is taken) and a non-empty
+`DEMO_USER_PASSWORD`.
+
+**1. Reset and start the database.** `-v` deletes the local data. That is needed after a
+migration was edited in place (V5 changed in Phase 6a); the seed is re-applied on startup.
+
+```bash
+docker compose down -v
+```
+
+```bash
+docker compose up -d --wait
+```
+
+**2. Start the scripted demo** (terminal A). It runs the application with the `dev` profile
+from the test classpath (`spring-boot:test-run`):
+
+```bash
+set -a; source .env; set +a
+```
+
+```bash
+./mvnw spring-boot:test-run -Dspring-boot.run.main-class=com.telco.billshock.demo.ScriptedDemoApplication
+```
+
+Wait for `Started BillShockAdvisorApplication`.
+
+**3. Open http://localhost:8080**, pick a demo customer, enter `DEMO_USER_PASSWORD` and send
+the suggested question ("Why is my bill so high?"). Each proposal appears as a card with
+**Confirm** and **Reject**. "My requests" lists every proposal and its status. "New chat"
+starts over.
+
+| Customer | Scenario | What the agent says and proposes | Click | Expected result |
+|---|---|---|---|---|
+| `cust1001` | UAE roaming, no pack (≈3.5x) | Roaming charges of ₹2,094.50 incl. GST; the IR_GCC_7D pack would have saved ₹1,033.68 incl. GST; a goodwill credit as if the pack had been active | Confirm | **Awaiting supervisor**: the credit is above the self-service policy, so a supervisor reviews it (supervisor queue: Phase 6b). Nothing is credited yet |
+| `cust1002` | Domestic data overage | On PP_499 the bill would have been ₹588.82 incl. GST, a saving of ₹317.00 incl. GST; a plan change from the next bill cycle | Confirm | **Executed**: a TMF622 plan-change order |
+| `cust1003` | Third-party VAS without double opt-in | Astro Daily started without a confirmed opt-in; unsubscribe with a refund of ₹231.28 incl. GST, and third-party barring; Cricket Scores stays (complete opt-in) | Confirm the Astro Daily card, then ask "Is it done?" | **Executed**: unsubscribe and refund, each once. The follow-up answer says it has been cancelled and refunded, which the claim gate allows only because both steps are done. Ask the follow-up *before* confirming to see the gate rewrite the claim |
+| `cust1004` | Mid-cycle plan upgrade | Two part-month rentals after the customer's own plan change on 1 September; expected | — | **No proposal** |
+| `cust1005` | Duplicate line item | The PP_599 rental is charged twice; a dispute of ₹706.82 incl. GST (no goodwill credit) | Confirm | **Executed**: a TMF621 billing-dispute ticket with a reference |
+| `cust1006` | Normal bill | In line with recent bills; nothing to change | — | **No proposal**, no invented issue |
+
+Double-clicking Confirm, or clicking it again after a network error, is safe: the page reuses
+the same `Idempotency-Key`, so the second request returns the stored response.
+
+**4. What happened, in the database:**
+
+```bash
+docker compose exec postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT action_id, account_id, action_type, status, amount, gst_amount, external_ref FROM proposed_action ORDER BY action_id" -c "SELECT action_id, event_type, actor_type, actor_ref FROM audit_events WHERE action_id IS NOT NULL ORDER BY occurred_at"
+```
+
+The scripts answer only the suggested first question per customer (and "Is it done?" for
+`cust1003`); anything else gets a fixed "this scripted demo has no further answers" reply.
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| Sign-in says wrong password | Terminal A did not load `.env`, or a different password was typed | Load `.env` in terminal A and restart step 2 |
+| Startup: checksum mismatch | The database predates the V5 change | Step 1 (`down -v`) |
+| An answer says "This scripted demo only covers the six seed scenarios" | The database is not the seeded one | Step 1 |
+
 ## Demo without an API key
 
 The chat works end to end without Anthropic in **template-only mode**. That is the global kill
@@ -128,7 +210,7 @@ be empty.
 `DEMO_USER_PASSWORD`. The app refuses to start without the latter.
 
 **1. Reset and start the database.** `-v` deletes the local data. That is needed after a
-migration was edited in place (V4 changed in Phase 5a); the seed is re-applied on startup.
+migration was edited in place (V4 in Phase 5a, V5 in Phase 6a); the seed is re-applied on startup.
 
 ```bash
 docker compose down -v
@@ -226,7 +308,7 @@ The other demo users work the same way: `cust1002` data overage, `cust1003` thir
 | `401` from curl | Terminal B has not loaded `.env`, or the app was started with a different password | Run `set -a; source .env; set +a` in terminal B |
 | Startup: `needs DEMO_USER_PASSWORD` | `DEMO_USER_PASSWORD` is empty in `.env` | Set any value in `.env`, then repeat step 2 |
 | Startup: `needs ANTHROPIC_API_KEY_CHAT` | The mode was not switched | Start with `BILLSHOCK_LLM_MODE=TEMPLATE_ONLY` as in step 2 |
-| Startup: checksum mismatch | The database predates the V4 change | Step 1 (`down -v`) |
+| Startup: checksum mismatch | The database predates the V4 or V5 change | Step 1 (`down -v`) |
 
 ## Build and test
 

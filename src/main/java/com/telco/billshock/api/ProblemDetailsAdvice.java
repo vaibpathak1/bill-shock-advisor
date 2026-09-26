@@ -1,6 +1,7 @@
 package com.telco.billshock.api;
 
 import java.net.URI;
+import java.util.Locale;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
@@ -17,6 +18,14 @@ import com.telco.billshock.agent.ConversationNotFoundException;
  */
 @RestControllerAdvice
 class ProblemDetailsAdvice extends ResponseEntityExceptionHandler {
+
+    @ExceptionHandler(ApiRequestException.class)
+    ProblemDetail badRequest(ApiRequestException e) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, e.getMessage());
+        problem.setType(URI.create("urn:billshock:problem:" + e.code().toLowerCase(Locale.ROOT).replace('_', '-')));
+        problem.setProperty("code", e.code());
+        return problem;
+    }
 
     @ExceptionHandler(ConversationNotFoundException.class)
     ProblemDetail conversationNotFound(ConversationNotFoundException e) {

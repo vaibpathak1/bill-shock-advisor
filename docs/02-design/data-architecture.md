@@ -168,12 +168,16 @@ that `PlanSimulator` can re-rate only with daily data (A-55).
 
 ### 4.4 Actions and idempotency
 - `proposed_action`: `action_id, account_id, conversation_id, action_type, status,
-  amount, currency, params jsonb, guardrail_result jsonb, requires_supervisor,
-  idempotency_key, expires_at, decided_by, decided_at, executed_at, external_ref,
-  failure_reason, version, created_at`.
+  amount, gst_amount, currency, params jsonb, target_ref, execution jsonb, guardrail_result jsonb,
+  requires_supervisor, idempotency_key, expires_at, decided_by, decided_at, executed_at,
+  external_ref, failure_reason, version, created_at`. **6a (V5 edited in place):** `target_ref`
+  with the partial unique index `proposed_action_target_uq` (at most one live action per target;
+  executed money-out, barring and disputes block repeats) and `execution` (one entry per BSS
+  step); `idempotency_key` holds the BSS key `pa-{action_id}` (actions.md §5).
 - `idempotency_record`: `(account_id, idempotency_key)`, `request_hash`, `response_status`,
   `response_body jsonb`, `created_at`. A repeat with the same key and hash returns the
   stored response; the same key with a different hash → 422 Problem Details.
+  `response_status = 0` marks a request still running (actions.md §6.6).
 
 ### 4.5 Audit
 `audit_events`: `audit_id, occurred_at, account_id, conversation_id, correlation_id,
@@ -249,7 +253,7 @@ makes it run once):
 | Q4 | `simulatePlans` day-based tariffs; "when" in explanations | `account_id = ? AND billed_period = ?` | PK of `usage_daily` | One partition, index scan, 0.5 ms |
 | Q5 | Chat memory window | `conversation_id = ? AND conversation_month = ? ORDER BY seq DESC LIMIT 12` | PK `(conversation_id, conversation_month, seq)` | One partition, backward index scan, 0.04 ms |
 | X1 | Roll-up at bill generation | as Q4, `GROUP BY usage_period` | PK of `usage_daily` | Index scan + hash aggregate, 0.03 ms warm |
-| X2 | Guardrail: executed credits in 6 months | `account_id = ? AND executed_at >= ?` (type, status fixed) | partial `(account_id, executed_at) WHERE action_type='GOODWILL_CREDIT' AND status='EXECUTED'` | Partial index scan, 0.02 ms |
+| X2 | Guardrail: executed credits in 6 months | `account_id = ? AND decided_at >= ?` (type, status fixed) | partial `(account_id, decided_at) WHERE action_type='GOODWILL_CREDIT' AND status IN ('EXECUTING','EXECUTED')` (6a: an `EXECUTING` credit may be applied, A-112) | Partial index scan, 0.02 ms (measured on the Phase 2 form of the index) |
 | X3 | `GET /actions?status=` | `account_id = ? AND status = ? ORDER BY created_at DESC` | `(account_id, status, created_at DESC)` | Index scan, 0.03 ms |
 | X4 | `GET /audit?conversationId=` | `conversation_id = ? AND occurred_at >= <UUIDv7 time>` | partial `(conversation_id, occurred_at) WHERE conversation_id IS NOT NULL` | Pruned to 2 partitions, 0.03 ms |
 | X5 | Any JDBC prepared statement | as Q3 with bind parameters, generic plan | — | **Runtime pruning** ("Subplans Removed: 4") |

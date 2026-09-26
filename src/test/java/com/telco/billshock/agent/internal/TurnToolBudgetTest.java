@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -27,6 +28,7 @@ import org.springframework.ai.tool.definition.ToolDefinition;
 import com.telco.billshock.agent.ToolCallBudget;
 import com.telco.billshock.audit.ToolCallAuditor;
 import com.telco.billshock.audit.ToolCallAuditor.Outcome;
+import com.telco.billshock.domain.AccountId;
 
 /** The per-turn budget decorator (Q-29; llm-architecture.md §9; agent.md §5). */
 class TurnToolBudgetTest {
@@ -61,9 +63,17 @@ class TurnToolBudgetTest {
 
     private final RecordingDelegate delegate = new RecordingDelegate();
     private final List<Audit> audits = new ArrayList<>();
-    private final ToolCallAuditor auditor = (conversationId, tool, args, sha, outcome) -> audits.add(new Audit(tool, outcome));
+    private final List<String> auditedArguments = new ArrayList<>();
+    private final ToolCallAuditor auditor = (account, conversationId, tool, args, sha, outcome) -> {
+        audits.add(new Audit(tool, outcome));
+        auditedArguments.add(args);
+    };
+    /** Refuses a goodwill amount of 999.00, standing in for "not found in the tool results" (A-110). */
+    private final TurnToolBudget.ArgumentCheck check = call -> call.name().equals("proposeGoodwillCredit")
+            && call.arguments().contains("999.00") ? Optional.of("{\"status\":\"REFUSED\"}") : Optional.empty();
     private final TurnToolBudget budget = new TurnToolBudget(delegate,
-            new ToolCallBudget(8, Set.of("escalateToHuman", "recordDiagnosis")), auditor, UUID.randomUUID());
+            new ToolCallBudget(8, Set.of("escalateToHuman", "recordDiagnosis")), auditor, AccountId.of(1001),
+            UUID.randomUUID(), check);
     private final Prompt prompt = new Prompt(List.of(new UserMessage("Why?")));
 
     private static ChatResponse calls(ToolCall... calls) {
@@ -79,6 +89,22 @@ class TurnToolBudgetTest {
     private static List<ToolResponse> responses(ToolExecutionResult result) {
         List<Message> history = result.conversationHistory();
         return ((ToolResponseMessage) history.getLast()).getResponses();
+    }
+
+    @Test
+    void anUngroundedArgumentIsRefusedAndAuditedWithoutRunningTheTool() {
+        ToolExecutionResult result = budget.executeToolCalls(prompt, calls(
+                new ToolCall("g1", "function", "proposeGoodwillCredit", "{\"amountExclGst\":\"999.00\"}"),
+                new ToolCall("g2", "function", "proposeGoodwillCredit",
+                        "{\"amountExclGst\":\"876.00\",\"reason\":\"call me on 9876543210\"}")));
+
+        assertThat(delegate.executed).containsExactly("g2");
+        assertThat(responses(result)).extracting(ToolResponse::responseData)
+            .containsExactly("{\"status\":\"REFUSED\"}", "result-g2");
+        assertThat(audits).containsExactly(new Audit("proposeGoodwillCredit", Outcome.REFUSED_UNGROUNDED_ARGUMENT),
+                new Audit("proposeGoodwillCredit", Outcome.EXECUTED));
+        // Arguments reach the audit log PII-scrubbed.
+        assertThat(auditedArguments.getLast()).contains("[PHONE]").doesNotContain("9876543210");
     }
 
     @Test

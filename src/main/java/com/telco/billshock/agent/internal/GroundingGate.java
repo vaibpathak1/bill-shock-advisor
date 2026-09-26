@@ -6,6 +6,8 @@ import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -49,22 +51,54 @@ final class GroundingGate {
     private static final Pattern CUSTOMER_NUMBER_WITH_UNIT = Pattern.compile(
             "(?i)(?<![\\d.,])(\\d{1,3}(?:,\\d{2,3})+(?:\\.\\d{1,2})?|\\d+(?:\\.\\d{1,2})?)\\s?(?:rupees?|rs\\b\\.?|inr\\b|/-)");
 
-    private static final Pattern FIRST_PERSON_ACTION = Pattern.compile(
-            "(?i)\\b(?:i|we)(?:'ve|\\s+have|\\s+had)?\\s+(?:already\\s+|now\\s+|just\\s+)?"
-                    + "(?:credited|refunded|cancell?ed|canceled|unsubscribed|changed|switched|upgraded|downgraded|"
-                    + "activated|deactivated|barred|blocked|raised|filed|applied|added|removed|waived|reversed|"
-                    + "processed|submitted)\\b");
+    /** Verbs that say an account change was made; each maps to the effect it claims (or none: generic). */
+    private static final String CLAIM_VERBS = "credited|refunded|cancell?ed|canceled|unsubscribed|changed|switched|"
+            + "upgraded|downgraded|activated|deactivated|barred|blocked|raised|filed|applied|added|removed|waived|"
+            + "reversed|processed|submitted|issued";
 
-    private static final Pattern PASSIVE_MONEY_OUT = Pattern.compile(
-            "(?i)\\b(?:has|have)\\s+been\\s+(?:credited|refunded|waived|reversed)\\b");
+    private static final Pattern FIRST_PERSON_ACTION = Pattern.compile(
+            "(?i)\\b(?:i|we)(?:'ve|\\s+have|\\s+had)?\\s+(?:already\\s+|now\\s+|just\\s+)?(?<verb>" + CLAIM_VERBS
+                    + ")\\b");
+
+    /**
+     * Passive claims: money out, unsubscribe and barring, and generic verbs ("your refund has been
+     * processed"). Not "changed", "activated", "applied" or "issued": bill explanations use them ("your
+     * bill has been issued", the customer's own past plan change in scenario 4) and must pass.
+     */
+    private static final Pattern PASSIVE_ACTION = Pattern.compile(
+            "(?i)\\b(?:has|have)\\s+been\\s+(?:already\\s+|now\\s+)?(?<verb>credited|refunded|waived|reversed|"
+                    + "cancell?ed|canceled|unsubscribed|deactivated|barred|blocked|processed|raised|filed|"
+                    + "submitted)\\b");
+
+    private static final Map<String, String> VERB_EFFECT = Map.ofEntries(Map.entry("credited", "CREDIT"),
+            Map.entry("waived", "CREDIT"), Map.entry("reversed", "CREDIT"), Map.entry("refunded", "REFUND"),
+            Map.entry("cancelled", "UNSUBSCRIBE"), Map.entry("canceled", "UNSUBSCRIBE"),
+            Map.entry("unsubscribed", "UNSUBSCRIBE"), Map.entry("deactivated", "UNSUBSCRIBE"),
+            Map.entry("removed", "UNSUBSCRIBE"), Map.entry("barred", "BARRING"), Map.entry("blocked", "BARRING"),
+            Map.entry("changed", "PLAN_CHANGE"), Map.entry("switched", "PLAN_CHANGE"),
+            Map.entry("upgraded", "PLAN_CHANGE"), Map.entry("downgraded", "PLAN_CHANGE"),
+            Map.entry("activated", "ADD_ON"), Map.entry("added", "ADD_ON"));
+
+    /** For generic verbs (processed, applied, raised, ...): the effect named by the sentence's noun. */
+    private static final Map<Pattern, String> NOUN_EFFECT = Map.of(
+            Pattern.compile("(?i)\\brefund"), "REFUND",
+            Pattern.compile("(?i)\\bcredit"), "CREDIT",
+            Pattern.compile("(?i)\\bdispute"), "DISPUTE",
+            Pattern.compile("(?i)\\b(?:ticket|specialist|colleague)"), "ESCALATION");
 
     static final String ACTION_CLAIM_REPLACEMENT =
             "I haven't changed anything on your account; any change needs your confirmation first. ";
+
+    /** Used once some effect of this conversation is done, so the rewrite does not deny it. */
+    static final String PARTIAL_CLAIM_REPLACEMENT = "Only the steps shown as done in your requests have been carried"
+            + " out; anything else still needs your confirmation or is being handled by our team. ";
 
     private final String canary;
     private final Set<String> allowedForms = new HashSet<>();
     private final Set<BigDecimal> allowedValues = new HashSet<>();
     private final Set<BigDecimal> customerValues = new HashSet<>();
+    private final Set<BigDecimal> allowedExclGst = new HashSet<>();
+    private final Set<String> doneEffects = new HashSet<>();
 
     GroundingGate(String canary) {
         this.canary = canary == null || canary.isBlank() ? null : canary.toLowerCase(Locale.ROOT);
@@ -75,7 +109,26 @@ final class GroundingGate {
         for (Token t : tokens(toolOutput)) {
             allowedForms.add(t.form());
             allowedValues.add(t.value());
+            if (t.form().endsWith(" excl. GST")) {
+                allowedExclGst.add(t.value());
+            }
         }
+    }
+
+    /**
+     * A goodwill amount argument must be an {@code excl. GST} amount from the allowed set (A-110;
+     * actions.md §3.1): the model copies it, it never computes it.
+     */
+    boolean groundedExclGst(BigDecimal value) {
+        return value != null && allowedExclGst.contains(value.stripTrailingZeros());
+    }
+
+    /**
+     * Effects the BSS confirmed for this conversation's actions ({@code ActionEffect} names). A claim
+     * that something was done passes only if every effect it names is here (actions.md §12).
+     */
+    void effectsDone(Set<String> effects) {
+        doneEffects.addAll(effects);
     }
 
     /** Records the amounts in a customer message, so that repeating one is recognised. */
@@ -102,10 +155,39 @@ final class GroundingGate {
                 return new Result(Verdict.LABEL_MISMATCH, sentence, false);
             }
         }
-        if (FIRST_PERSON_ACTION.matcher(sentence).find() || PASSIVE_MONEY_OUT.matcher(sentence).find()) {
-            return new Result(Verdict.PASS, ACTION_CLAIM_REPLACEMENT, true);
+        Optional<Set<String>> claimed = claimedEffects(sentence);
+        if (claimed.isPresent() && !(claimed.get().size() > 0 && doneEffects.containsAll(claimed.get()))) {
+            return new Result(Verdict.PASS,
+                    doneEffects.isEmpty() ? ACTION_CLAIM_REPLACEMENT : PARTIAL_CLAIM_REPLACEMENT, true);
         }
         return new Result(Verdict.PASS, sentence, false);
+    }
+
+    /**
+     * The effects a sentence claims were carried out, or empty if it claims none. A claim with a
+     * generic verb and no recognisable noun claims an unknown effect (an empty set), which never passes.
+     */
+    static Optional<Set<String>> claimedEffects(String sentence) {
+        Set<String> effects = new HashSet<>();
+        boolean claim = false;
+        for (Pattern p : List.of(FIRST_PERSON_ACTION, PASSIVE_ACTION)) {
+            Matcher m = p.matcher(sentence);
+            while (m.find()) {
+                claim = true;
+                String effect = VERB_EFFECT.get(m.group("verb").toLowerCase(Locale.ROOT));
+                if (effect != null) {
+                    effects.add(effect);
+                }
+                else {
+                    NOUN_EFFECT.forEach((noun, e) -> {
+                        if (noun.matcher(sentence).find()) {
+                            effects.add(e);
+                        }
+                    });
+                }
+            }
+        }
+        return claim ? Optional.of(effects) : Optional.empty();
     }
 
     /** The distinct amount strings in a text, in order (for the end-of-turn digest). */

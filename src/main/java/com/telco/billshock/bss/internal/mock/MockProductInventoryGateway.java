@@ -1,5 +1,6 @@
 package com.telco.billshock.bss.internal.mock;
 
+import com.telco.billshock.bss.BssRejectedException;
 import com.telco.billshock.bss.ProductInventoryGateway;
 import com.telco.billshock.domain.AccountId;
 import com.telco.billshock.domain.Money;
@@ -19,7 +20,9 @@ import java.util.concurrent.atomic.AtomicLong;
 /**
  * Mock TMF622: subscriptions with opt-in evidence and past orders from
  * {@code inventory.json}. New orders are recorded in memory and are idempotent per
- * idempotency key; they do not change the fixture data.
+ * idempotency key; they do not change the fixture data (so an unsubscribed VAS still shows as
+ * active in the demo). A VAS unsubscribe for a subscription the account does not hold is a
+ * definite rejection ({@link BssRejectedException}).
  */
 @Component
 @Profile("mock-bss")
@@ -47,6 +50,12 @@ class MockProductInventoryGateway implements ProductInventoryGateway {
     @Override
     public OrderReceipt submitOrder(OrderRequest request) {
         return receiptsByKey.computeIfAbsent(request.idempotencyKey(), key -> {
+            if (request.action() == OrderAction.VAS_UNSUBSCRIBE && account(request.accountId()).products()
+                .stream()
+                .noneMatch(p -> p.type() == ProductType.VAS && p.subscriptionId().equals(request.subscriptionId()))) {
+                // A definite rejection: nothing was applied, so no receipt is kept for the key.
+                throw new BssRejectedException("UNKNOWN_SUBSCRIPTION", "No such VAS subscription on the account");
+            }
             submitted.add(request);
             return new OrderReceipt("MOCK-ORD-" + orderSequence.incrementAndGet(), "ACKNOWLEDGED");
         });

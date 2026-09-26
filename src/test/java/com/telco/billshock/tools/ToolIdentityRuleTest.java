@@ -27,16 +27,19 @@ class ToolIdentityRuleTest {
             "subscriber");
 
     private static Stream<Method> toolMethods() {
-        return Stream.of(BillingTools.class, UsageTools.class, CatalogTools.class, DiagnosisTool.class)
+        return Stream.of(BillingTools.class, UsageTools.class, CatalogTools.class, DiagnosisTool.class,
+                ActionTools.class, EscalationTool.class)
             .flatMap(c -> Arrays.stream(c.getDeclaredMethods()))
             .filter(m -> m.isAnnotationPresent(Tool.class));
     }
 
     @Test
-    void theNineToolsAreFound() {
+    void theSixteenToolsAreFound() {
         assertThat(toolMethods().map(m -> m.getAnnotation(Tool.class).name())).containsExactlyInAnyOrder(
                 "getBillSummary", "getBillHistory", "diffBills", "getLineItems", "getUsageDetails",
-                "getActiveSubscriptions", "searchPlanCatalog", "simulatePlans", "recordDiagnosis");
+                "getActiveSubscriptions", "searchPlanCatalog", "simulatePlans", "recordDiagnosis",
+                "proposeGoodwillCredit", "proposeVasUnsubscribe", "proposeThirdPartyBarring", "proposePlanChange",
+                "proposeAddOn", "raiseDispute", "escalateToHuman");
     }
 
     @Test

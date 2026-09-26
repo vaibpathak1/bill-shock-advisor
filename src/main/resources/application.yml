@@ -52,7 +52,7 @@ billshock:
   guardrails:
     # SPEC §4.5; deterministic-core.md §4. Never shown to the LLM. GST-inclusive (Q-20),
     # limits inclusive (A-84).
-    autonomy-level: 1           # MVP slice: fixed at Level 1 (ADR-004)
+    autonomy-level: 1           # MVP slice: fixed at Level 1 (ADR-004, A-109); 0 = only escalateToHuman
     history-months: 6           # local bill history searched for cited line items (7 bills)
     # Every money-out action (goodwill credit, VAS refund) above this is escalated; none is uncapped.
     money-out-escalate-above-inr: 2000.00
@@ -60,6 +60,16 @@ billshock:
       auto-approval-max-inr: 500.00
       auto-approval-max-bill-share-pct: 15
       prior-credit-lookback-months: 6
+
+  actions:
+    # actions.md §5.1, A-111: a PENDING_CONFIRMATION proposal can be confirmed for this long.
+    pending-ttl: PT24H
+
+  meta:
+    # GET /api/v1/meta returns only these two (owner answer 6). scripted-model is true only in the
+    # scripted demo run (spring-boot:test-run, actions.md §8.2).
+    scripted-model: false
+    version: "@project.version@"
 
   agent:
     tool-calls:

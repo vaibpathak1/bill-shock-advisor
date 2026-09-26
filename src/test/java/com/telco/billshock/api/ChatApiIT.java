@@ -15,6 +15,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
+import com.telco.billshock.bss.TroubleTicketGateway;
+import com.telco.billshock.bss.internal.mock.BssFaults;
 import com.telco.billshock.support.FakeAnthropicApi;
 import com.telco.billshock.support.FakeAnthropicApi.Script;
 import com.telco.billshock.support.FakeAnthropicApi.ToolUse;
@@ -290,6 +292,17 @@ class ChatApiIT {
         assertThat(r.first("fallback").data().get("reason").asString()).isEqualTo("TOOL_BUDGET");
         assertThat(r.first("fallback").data().get("text").asString()).endsWith("colleague who can look into it further.");
         assertThat(API.requests()).hasSize(9);
+
+        // SPEC §4.5 "then escalate", done by the orchestrator (actions.md §3.4): a hand-off ticket, at once.
+        var action = r.first("action").data();
+        assertThat(action.get("type").asString()).isEqualTo("ESCALATION");
+        assertThat(action.get("status").asString()).isEqualTo("ESCALATED");
+        long actionId = action.get("actionId").asLong();
+        assertThat(BssFaults.tickets("pa-" + actionId)).singleElement()
+            .satisfies(t -> assertThat(t.type()).isEqualTo(TroubleTicketGateway.TicketType.ESCALATION));
+        assertThat(action.get("reference").asString()).isEqualTo(
+                jdbc.sql("SELECT external_ref FROM proposed_action WHERE action_id = ?").param(actionId)
+                    .query(String.class).single());
     }
 
     @Test

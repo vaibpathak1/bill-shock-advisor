@@ -1,5 +1,6 @@
 package com.telco.billshock.agent.internal;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
@@ -27,6 +28,7 @@ import com.telco.billshock.agent.LlmProperties.Mode;
 import com.telco.billshock.agent.ToolCallBudgetProperties;
 import com.telco.billshock.tools.BillingTools;
 import com.telco.billshock.tools.CatalogTools;
+import com.telco.billshock.tools.ConversationActions;
 import com.telco.billshock.tools.UsageTools;
 
 /**
@@ -73,13 +75,17 @@ class LlmConfiguration {
     }
 
     /**
-     * The read-only tools plus {@code recordDiagnosis}, sorted by name, so the tool definitions
-     * (the start of the cached prefix) are identical on every request (llm-architecture.md §5).
+     * The read-only tools, {@code recordDiagnosis} and the action tools of the autonomy level (Level
+     * 0: only {@code escalateToHuman}; A-109), sorted by name, so the tool definitions (the start of
+     * the cached prefix) are identical on every request (llm-architecture.md §5).
      */
     @Bean
-    ChatTools chatTools(BillingTools billing, UsageTools usage, CatalogTools catalog, DiagnosisTool diagnosis) {
+    ChatTools chatTools(BillingTools billing, UsageTools usage, CatalogTools catalog, DiagnosisTool diagnosis,
+            ConversationActions actions) {
+        List<Object> toolObjects = new ArrayList<>(List.of(billing, usage, catalog, diagnosis));
+        toolObjects.addAll(actions.toolObjects());
         ToolCallback[] callbacks = MethodToolCallbackProvider.builder()
-            .toolObjects(billing, usage, catalog, diagnosis)
+            .toolObjects(toolObjects.toArray())
             .build()
             .getToolCallbacks();
         return new ChatTools(Arrays.stream(callbacks)

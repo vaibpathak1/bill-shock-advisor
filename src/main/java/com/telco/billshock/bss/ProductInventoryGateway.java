@@ -19,6 +19,10 @@ public interface ProductInventoryGateway {
 
     List<ProductOrder> orders(AccountId accountId);
 
+    /**
+     * @throws BssRejectedException the BSS definitely did not apply the request
+     * @throws BssUnavailableException the outcome is unknown (timeout, connection error); retry with the same key
+     */
     OrderReceipt submitOrder(OrderRequest request);
 
     enum ProductType {
@@ -55,8 +59,14 @@ public interface ProductInventoryGateway {
             LocalDate effectiveDate, String channel, String status) {
     }
 
+    /**
+     * @param subscriptionId the subscription the order changes (VAS unsubscribe), or {@code null}
+     * @param productCode the plan or add-on ordered, or {@code null}
+     * @param effective {@code IMMEDIATE} or {@code NEXT_CYCLE} for a plan change, else {@code null}
+     * @param idempotencyKey repeated requests with the same key must not order twice
+     */
     record OrderRequest(AccountId accountId, OrderAction action, String subscriptionId,
-            String productCode, String idempotencyKey) {
+            String productCode, String effective, String idempotencyKey) {
     }
 
     record OrderReceipt(String orderId, String status) {
