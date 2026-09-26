@@ -1,12 +1,70 @@
 # Bill Shock Advisor
 
-An agentic assistant that investigates unexpected spikes in a telecom customer's bill,
-explains the root cause, proposes tailored resolutions and executes approved actions
-within guardrails. Specification: [SPEC.md](SPEC.md). Progress: [docs/PROGRESS.md](docs/PROGRESS.md).
+## What and why
 
-> Status: the MVP demo slice (Phases 3a–6a) is built: grounded chat, proposed actions with
-> confirm/reject, a chat page, and a demo of all six scenarios that runs without an API key
-> (see "Scripted demo: all six scenarios").
+"Bill shock" is a telecom bill that is much higher than the customer expects. Typical causes
+are roaming without a pack, data overage, a third-party subscription the customer never
+knowingly started, or a duplicate charge. It drives care calls, disputes and churn. Bill Shock
+Advisor is an AI agent for postpaid customers (India: ₹, GST) that finds out why the bill went
+up, explains it with exact amounts, and proposes a fix: a plan change, an unsubscribe with
+refund, a dispute or a goodwill credit. Nothing changes on the account until the customer
+confirms, and every amount comes from deterministic Java code, not from the model.
+
+> **Status (honest):** the MVP slice (Phases 3a–6a) is built and `./mvnw verify` passes
+> (247 unit and 146 integration tests). The LLM path is tested against a local fake of the
+> Anthropic API; **checks against the real model have not been run yet** (no API credits).
+> The [demo](#scripted-demo-all-six-scenarios) therefore uses a **scripted model**: only the
+> model's words and tool choices are fixed; tools, gates, guardrails, actions and audit run for
+> real. There is also a [template-only mode](#demo-without-an-api-key) with no model at all.
+
+## Architecture
+
+[![Runtime architecture](docs/diagrams/01-architecture.png)](docs/diagrams/01-architecture.html)
+
+The PNG is a snapshot. For the interactive version, with guided views and a link from each box
+to its source file, download and open [01-architecture.html](docs/diagrams/01-architecture.html).
+GitHub shows HTML files as source rather than rendering them. Four more diagrams are in
+[docs/diagrams/](docs/diagrams/): one chat turn, the action lifecycle, customer data flow, and
+the confirm flow.
+
+## Key engineering decisions
+
+- **The LLM never does money math.** Java engines (`BillDiffEngine`, `PlanSimulator`) compute
+  every amount in `BigDecimal`; the model only chooses tools and explains.
+  [ADR-003](docs/02-design/adr/003-llm-never-does-arithmetic.md)
+- **Identity comes from the SecurityContext, never from the model.** No tool has an account
+  or phone-number parameter (a reflection test enforces this), so a prompt injection cannot
+  read another customer's data. Another customer's conversation or action returns 404.
+  [ADR-009](docs/02-design/adr/009-identity-from-security-context.md)
+- **Human in the loop, with an idempotent confirm.** Action tools only create a
+  `ProposedAction`. The customer's confirm carries an `Idempotency-Key`; guardrails run again
+  on fresh data, and the BSS call happens outside the database transaction.
+  [ADR-004](docs/02-design/adr/004-hitl-proposed-action-autonomy-ladder.md),
+  [actions.md §6](docs/03-development/actions.md)
+- **An unknown outcome is not a failure.** If the billing system times out, the effect may
+  already exist, so the action stays `EXECUTING` and is re-driven with the same key. Only a
+  definite rejection marks it `FAILED`. [ADR-004](docs/02-design/adr/004-hitl-proposed-action-autonomy-ladder.md)
+  (amended 2026-09-26), [actions.md §6.3](docs/03-development/actions.md)
+- **Sentence-level grounding gate.** Each sentence is checked before it is streamed: every ₹
+  amount must match a tool result exactly, including its GST label. A mismatch triggers one
+  regeneration; anything else falls back to a deterministic template answer.
+  [ADR-003](docs/02-design/adr/003-llm-never-does-arithmetic.md),
+  [agent.md §8.1](docs/03-development/agent.md)
+
+## How it was built
+
+- **Spec first.** [SPEC.md](SPEC.md) came before any code, followed by requirements, design
+  docs and ADRs ([docs/](docs/)). Anything unknown is written down as a numbered assumption.
+- **Phase gates.** The work is split into phases (SPEC §11). Each phase ends at a gate: a
+  summary, the open questions, and a stop until the owner approves. Decisions and answers are
+  logged in [docs/PROGRESS.md](docs/PROGRESS.md).
+- **AI-assisted development with Claude Code.** The coding agent works under the rules in
+  [AGENTS.md](AGENTS.md): one phase at a time, check library APIs against the pinned jars
+  instead of writing them from memory, never skip a failing test, never touch secrets.
+- **Human review at every gate.** The repository owner reviews each design note and each
+  phase's code before the next phase starts; the review answers are in PROGRESS.md. Phases 1–6a
+  have passed their gates; the MVP slice is tagged `v0.1.0-mvp`. The live-model checks from 5a
+  are still open (see Status above).
 
 ## Prerequisites
 

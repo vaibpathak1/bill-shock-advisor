@@ -7,7 +7,7 @@
 | 3a. Foundation (MVP slice) | **Done, approved** (owner, 2026-09-25). Gate-review changes applied; `./mvnw verify` passes | Scope: plan-and-budget §2a |
 | 4a. Deterministic core (MVP slice) | **Done, approved and committed** (owner, 2026-09-25); `./mvnw verify` passes (112 unit + 94 IT) | Design: `docs/03-development/deterministic-core.md` |
 | 5a. Agent (MVP slice) | **Gate review changes applied** (2026-09-25); `./mvnw verify` passes (201 unit + 121 IT). Live checks **deferred — run when API key is available** | Design: `docs/03-development/agent.md` |
-| 6a. Actions (MVP slice) + demo wrap-up | **Code gate** (2026-09-26): design approved; built; `./mvnw verify` passes (247 unit + 146 IT) | Design: `docs/03-development/actions.md` |
+| 6a. Actions (MVP slice) + demo wrap-up | **Done, approved** (owner, 2026-09-26); tagged `v0.1.0-mvp`; `./mvnw verify` passes (247 unit + 146 IT) | Design: `docs/03-development/actions.md` |
 | 3b. Foundation (remainder) | Not started | |
 | 4b. Deterministic core (remainder) | Not started | |
 | 5b. Agent (remainder) | Not started | Haiku-first routing decision (Q-13) |
@@ -734,6 +734,23 @@ Open, carried forward:
 - the scripted demo covers only the suggested first question per customer
 - the A-86 refund limitation stands
 - the 6b reconcile job must also complete "in progress" idempotency records
+
+## Onboarding diagrams (2026-09-26, branch `docs/diagrams`)
+
+Five standalone HTML diagrams (Archify) in `docs/diagrams/`, each with its JSON source.
+They are based on the code at `9c531eb`, architecture.md, agent.md and actions.md.
+- `01-architecture`: runtime components, the trust boundary, and what is planned (Redis, Kafka + proactive-worker)
+- `02-chat-turn.sequence`: login, pre-fetch, summary within 1.5 s, tool loop, sentence gate, fallback
+- `03-proposed-action.lifecycle`: ProposedAction states, including the unknown outcome that stays EXECUTING
+- `04-customer-data.dataflow`: scrubber, masked MSISDN, what reaches the LLM and what does not
+- `05-confirm-flow.workflow`: idempotency key, re-check, BSS outside the transaction, re-drive
+
+ADR-009 (identity from the security context, never from the LLM) records the rule already
+implemented in 3a–6a and its tests; README "Key engineering decisions" links to it.
+
+Simplifications, on purpose: SSE events are drawn from the orchestrator straight to the page
+(they actually pass through the controller's `SseEmitter`); the lifecycle does not draw `AUTO_APPROVED` (6b, named in a card) or the
+confirm-time PENDING_CONFIRMATION → ESCALATED transition (the confirm flow shows it as "No execution").
 
 ## Next step
 
